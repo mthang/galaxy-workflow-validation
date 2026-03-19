@@ -42,6 +42,11 @@ github.com/iwc-workflows/Assembly-decontamination-VGP9/main                 git@
 
 ```
 
+Query workflow version
+```
+dockstore workflow info --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main
+```
+
 ## Dockstore download specific version of a workflow
 ```
 dockstore workflow download --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main:v1.2
