@@ -47,6 +47,31 @@ Query workflow version
 dockstore workflow info --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main
 ```
 
+Get workflow version
+```
+bash get_wf_version_arg.sh github.com/iwc-workflows/Assembly-decontamination-VGP9/main
+
+Output
+main
+v1.3
+v1.2
+v1.1
+v1.0
+v0.8
+v0.7
+v0.6
+v0.5
+v0.4
+v0.3
+v0.2
+v0.1.6
+v0.1.4
+v0.1.3
+v0.1.2
+v0.1.1
+v0.1
+```
+
 ## Dockstore download specific version of a workflow
 ```
 dockstore workflow download --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main:v1.2
