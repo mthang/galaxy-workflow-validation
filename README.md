@@ -102,8 +102,8 @@ cat tool_test_output.json | jq -r '
 ```
 
 REFERENCE
-- [IWC workflow] (https://github.com/galaxyproject/iwc/blob/main/workflows/README.md)
--[] Running Galaxy workflows](https://planemo.readthedocs.io/en/stable/running.html)
+- [IWC workflow](https://github.com/galaxyproject/iwc/blob/main/workflows/README.md)
+- [Running Galaxy workflows](https://planemo.readthedocs.io/en/stable/running.html)
 - Workflow Example on Dockstore
 	- [Assembly-decontamination-VGP9](https://dockstore.org/workflows/github.com/iwc-workflows/Assembly-decontamination-VGP9/main:main?tab=info)
 	- [Scaffolding-HiC-VGP8](https://dockstore.org/workflows/github.com/iwc-workflows/Scaffolding-HiC-VGP8/main:main?tab=info)
