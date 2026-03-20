@@ -1,5 +1,17 @@
 # Galaxy Workflow Validation
 
+## Register a Dockstore account
+```
+1. Go to https://dockstore.org/register
+2. Login with either github or google account
+```
+
+## Obtain Dockstore Token
+```
+1. Click on your username at the top right
+2. Click on *account* on the drop-down menu
+3. Get your Token under *Dockstore Account* 
+```
 ## Environment Setup (Ubuntu)
 ```
 1. Go to https://dockstore.org/quick-start
@@ -77,6 +89,15 @@ v0.1
 dockstore workflow download --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main:v1.3
 ```
 Note: The Assembly-decontamination-VGP9 (v1.3) workflow on [github](https://github.com/iwc-workflows/Assembly-decontamination-VGP9/blob/v1.3/Assembly-decontamination-VGP9.ga)
+
+## Obtain Galaxy API Key
+```
+1. Go to https://usegalaxy.org.au/
+2. Log into Galaxy
+3. Click on your username at the top right
+4. Click on *preference*
+5. Click on *Manage Galaxy API Key* 
+```
 ## Setup Planemo for testing workflow
 ```
 planemo profile_create galaxy_profile --galaxy_url https://usegalaxy.org.au --galaxy_user_key your_galaxy_api_key --engine external_galaxy
