@@ -74,9 +74,9 @@ v0.1
 
 ## Dockstore download specific version of a workflow
 ```
-dockstore workflow download --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main:v1.2
+dockstore workflow download --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main:v1.3
 ```
-
+Note: The Assembly-decontamination-VGP9 (v1.3) workflow on [github](https://github.com/iwc-workflows/Assembly-decontamination-VGP9/blob/v1.3/Assembly-decontamination-VGP9.ga)
 ## Setup Planemo for testing workflow
 ```
 planemo profile_create galaxy_profile --galaxy_url https://usegalaxy.org.au --galaxy_user_key your_galaxy_api_key --engine external_galaxy
@@ -86,6 +86,10 @@ planemo profile_create galaxy_profile --galaxy_url https://usegalaxy.org.au --ga
 This step generates tool_test_output.json and it can use as a missing tool report
 ```
 planemo test Scaffolding-HiC-VGP8.ga --profile galaxy_profile
+
+or
+
+planemo test Assembly-decontamination-VGP9.ga --profile galaxy_profile
 ```
 
 ## Check missing tools
@@ -96,3 +100,12 @@ cat tool_test_output.json | jq -r '
   capture("(?<tools>toolshed[^\"]*)").tools |
   split(", ")[] '
 ```
+
+REFERENCE
+- [IWC workflow] (https://github.com/galaxyproject/iwc/blob/main/workflows/README.md)
+-[] Running Galaxy workflows](https://planemo.readthedocs.io/en/stable/running.html)
+- Workflow Example on Dockstore
+	- [Assembly-decontamination-VGP9](https://dockstore.org/workflows/github.com/iwc-workflows/Assembly-decontamination-VGP9/main:main?tab=info)
+	- [Scaffolding-HiC-VGP8](https://dockstore.org/workflows/github.com/iwc-workflows/Scaffolding-HiC-VGP8/main:main?tab=info)
+- [Dockstore documentation](https://docs.dockstore.org/en/latest/launch-with/galaxy-launch-with.html)
+- [Browsing Workflow in Dockstore and Galaxy](https://docs.dockstore.org/en/latest/launch-with/galaxy-launch-with.html)
