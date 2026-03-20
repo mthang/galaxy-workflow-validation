@@ -1,7 +1,9 @@
 #!/bin/bash
 
-# Script: get_workflow_versions.sh
-# Usage: ./get_workflow_versions.sh github.com/iwc-workflows/Assembly-decontamination-VGP9/main
+# Script: get_wf_version_arg.sh
+# Usage: ./get_wf_version_arg.sh github.com/iwc-workflows/Assembly-decontamination-VGP9/main
+# Usage: ./get_wf_version_arg.sh github.com/iwc-workflows/Scaffolding-HiC-VGP8/main
+
 
 WORKFLOW_PATH="$1"
 
