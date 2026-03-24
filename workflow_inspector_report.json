@@ -1,0 +1,133 @@
+{
+  "generated": "2026-03-24T01:00:26.301838",
+  "galaxy_profile": "galaxy_profile",
+  "total_versions_processed": 1,
+  "unique_workflows": 1,
+  "workflows_with_missing_tools": 1,
+  "all_missing_tools": [
+    "toolshed.g2.bx.psu.edu/repos/richard-burhans/ncbi_fcs_adaptor/ncbi_fcs_adaptor/0.5.0+galaxy0"
+  ],
+  "workflow_details": [
+    {
+      "entry": "github.com/iwc-workflows/Assembly-decontamination-VGP9/main",
+      "version": "v1.3",
+      "timestamp": "2026-03-24T01:00:26.301749",
+      "workflow_path": "workflow_workspace/github_com_iwc-workflows_Assembly-decontamination-VGP9_main/v1.3/Assembly-decontamination-VGP9.ga",
+      "workflow_info": {
+        "entry": "github.com/iwc-workflows/Assembly-decontamination-VGP9/main",
+        "versions": [
+          "main",
+          "v1.3",
+          "v1.2",
+          "v1.1",
+          "v1.0",
+          "v0.8",
+          "v0.7",
+          "v0.6",
+          "v0.5",
+          "v0.4",
+          "v0.3",
+          "v0.2",
+          "v0.1.6",
+          "v0.1.4",
+          "v0.1.3",
+          "v0.1.2",
+          "v0.1.1",
+          "v0.1"
+        ],
+        "author": "Nadolina Brajuka",
+        "date_uploaded": null,
+        "git_repo": null
+      },
+      "galaxy_profile": "galaxy_profile",
+      "missing_tools": [
+        "toolshed.g2.bx.psu.edu/repos/richard-burhans/ncbi_fcs_adaptor/ncbi_fcs_adaptor/0.5.0+galaxy0"
+      ],
+      "test_results": {
+        "summary": {
+          "num_errors": 2,
+          "num_failures": 0,
+          "num_skips": 0,
+          "num_tests": 2
+        },
+        "tests": [
+          {
+            "data": {
+              "end_datetime": "2026-03-24T00:59:57.333129",
+              "execution_problem": "Unexpected HTTP status code: 400: {\"err_msg\":\"Workflow was not invoked; the following required tools are not installed: toolshed.g2.bx.psu.edu/repos/richard-burhans/ncbi_fcs_adaptor/ncbi_fcs_adaptor/0.5.0+galaxy0 (version 0.5.0+galaxy0)\",\"err_code\":0}",
+              "inputs": {
+                "Assembly Name": "Hg19",
+                "Database for NCBI FCS GX": "test-only",
+                "Haplotype": "Haplotype 1",
+                "Maximum length of sequence to consider for mitochondrial scaffolds": 0,
+                "Scaffolded assembly (fasta)": {
+                  "class": "File",
+                  "filetype": "fasta.gz",
+                  "hashes": [
+                    {
+                      "hash_function": "SHA-1",
+                      "hash_value": "7ae7b2e76aad9ac560657a87faee53438dcfe708"
+                    }
+                  ],
+                  "location": "https://zenodo.org/records/16999526/files/Genome_assembly.fasta.gz"
+                },
+                "Species Binomial Name": "Homo Sapiens",
+                "Taxonomic Identifier": "9606"
+              },
+              "output_problems": [],
+              "start_datetime": "2026-03-24T00:59:36.090969",
+              "status": "error"
+            },
+            "doc": "Test outline for Assembly-decontamination-VGP9",
+            "has_data": true,
+            "id": "Assembly-decontamination-VGP9.ga_0",
+            "test_type": "galaxy_workflow"
+          },
+          {
+            "data": {
+              "end_datetime": "2026-03-24T01:00:17.500099",
+              "execution_problem": "Unexpected HTTP status code: 400: {\"err_msg\":\"Workflow was not invoked; the following required tools are not installed: toolshed.g2.bx.psu.edu/repos/richard-burhans/ncbi_fcs_adaptor/ncbi_fcs_adaptor/0.5.0+galaxy0 (version 0.5.0+galaxy0)\",\"err_code\":0}",
+              "inputs": {
+                "Assembly Name": "Hg19",
+                "Database for NCBI FCS GX": "test-only",
+                "Haplotype": "Haplotype 1",
+                "Maximum length of sequence to consider for mitochondrial scaffolds": 0,
+                "Scaffolded assembly (fasta)": {
+                  "class": "File",
+                  "filetype": "fasta",
+                  "hashes": [
+                    {
+                      "hash_function": "SHA-1",
+                      "hash_value": "e51edc961b61efb217eaf823727507265e77d637"
+                    }
+                  ],
+                  "location": "https://zenodo.org/records/17296714/files/Genome_assembly_2.fasta"
+                },
+                "Species Binomial Name": "Homo Sapiens",
+                "Taxonomic Identifier": "9606"
+              },
+              "output_problems": [],
+              "start_datetime": "2026-03-24T00:59:57.337288",
+              "status": "error"
+            },
+            "doc": "Test outline for Assembly-decontamination-VGP9 without mid-sequence adaptors",
+            "has_data": true,
+            "id": "Assembly-decontamination-VGP9.ga_1",
+            "test_type": "galaxy_workflow"
+          }
+        ],
+        "version": "0.1"
+      },
+      "status": "tested",
+      "test_output_json": "workflow_workspace/github_com_iwc-workflows_Assembly-decontamination-VGP9_main/v1.3/tool_test_output.json",
+      "test_output_html": "workflow_workspace/github_com_iwc-workflows_Assembly-decontamination-VGP9_main/v1.3/tool_test_output.html"
+    }
+  ],
+  "statistics": {
+    "total_missing_tools": 1,
+    "versions_by_workflow": {
+      "github.com/iwc-workflows/Assembly-decontamination-VGP9/main": 1
+    }
+  },
+  "unique_missing_tools_count": 1
+}
