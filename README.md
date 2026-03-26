@@ -39,13 +39,18 @@ pip install planemo
 ```
 Reference: https://planemo.readthedocs.io/en/stable/installation.html
 
-## Dockstore search and download
-Use Dockstore cli to search workflow
+## Dockstore list,  search or download workflow
+List all iwc published workflows on dockstore 
+```
+dockstore workflow search --pattern iwc-workflows
+```
+
+Use Dockstore cli to search for particular workflow
 ```
 dockstore workflow search --pattern Assembly-decontamination-VGP9
 ```
 
-This is the output of the dockstore cli
+The output of the dockstore cli search with pattern parameter
 ```
 MATCHING WORKFLOWS
 ---------------------------------------------
