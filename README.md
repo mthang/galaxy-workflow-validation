@@ -125,7 +125,7 @@ cat tool_test_output.json | jq -r '
 ## Run workflow inspector
 This workflow inspector contains the dockstore and planemo tool to query and test the workflow of interest
 ```
-python workflow_inspector.py --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" --version "v1.2"
+python workflow_inspector.py --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" --version "v1.3"
 ```
 
 REFERENCE
