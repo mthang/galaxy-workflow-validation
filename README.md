@@ -32,6 +32,7 @@
 ```
 
 ## Planemo Setup
+Planemo is used to test workflow, tools and etc.
 ```
 python -m venv planemo
 . planemo/bin/activate
@@ -39,6 +40,11 @@ pip install planemo
 ```
 Reference: https://planemo.readthedocs.io/en/stable/installation.html
 
+## Bioblend Setup
+Bioblend is used to query and retrieve tools information from Toolshed.
+```
+pip install bioblend
+```
 ## Dockstore list,  search or download workflow
 List all iwc published workflows on dockstore 
 ```
