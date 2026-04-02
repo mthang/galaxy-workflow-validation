@@ -133,10 +133,104 @@ cat tool_test_output.json | jq -r '
   split(", ")[] '
 ```
 
-## Run workflow inspector
-This workflow inspector contains the dockstore and planemo tool to query and test the workflow of interest
+## Run workflow inspector (Dockstore)
+This workflow inspector queries Dockstore and tests the workflow of interest using Planemo
 ```
 python workflow_inspector.py --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" --version "v1.3"
+```
+
+## WorkflowHub workflow inspection
+Workflows can also be validated from [WorkflowHub](https://workflowhub.eu), which hosts Galaxy workflows independently of Dockstore. The `workflowhub_inspector.py` script queries the WorkflowHub TRS API, downloads `.ga` files, tests them with Planemo, and reports missing tools via BioBlend — no Dockstore CLI required.
+
+No additional installation is needed beyond the Planemo and BioBlend setup above.
+
+List matching workflows without testing
+```
+python workflowhub_inspector.py --search "assembly" --max-workflows 10 --list-only
+```
+
+List all versions of a specific workflow by its WorkflowHub ID
+```
+python workflowhub_inspector.py --id 645 --list-only
+```
+
+Test a specific workflow ID and version
+```
+python workflowhub_inspector.py --id 645 --version 1
+```
+
+Search and test multiple workflows (2 versions each by default)
+```
+python workflowhub_inspector.py --search "decontamination" --max-workflows 3
+```
+
+Test all versions of a workflow
+```
+python workflowhub_inspector.py --id 645 --versions-per-workflow all --output vgp_report.json
+```
+
+Results are saved as both a JSON report and a plain-text table (e.g. `vgp_report.json` and `vgp_report.txt`). The text report lists each workflow version, the number of missing tools, and installation commands for missing tools via ToolShed.
+
+Full list of options
+```
+python workflowhub_inspector.py --help
+```
+
+## Tool availability checker (galaxy_workflow_checker.py)
+Check whether all tools required by a workflow are installed in Galaxy Australia,
+without needing to run the workflow. Works with workflows from Dockstore, WorkflowHub, or both.
+Reads Galaxy credentials automatically from your Planemo profile.
+
+List matching workflows without checking tools
+```
+python galaxy_workflow_checker.py --source workflowhub --search "assembly" --list-only
+python galaxy_workflow_checker.py --source dockstore --search "VGP" --list-only
+python galaxy_workflow_checker.py --source both --search "decontamination" --list-only
+```
+
+Check tools in the latest version of a specific workflow
+```
+# By WorkflowHub ID
+python galaxy_workflow_checker.py --source workflowhub --id 645
+
+# By Dockstore entry
+python galaxy_workflow_checker.py --source dockstore \
+    --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main"
+```
+
+Control which versions are checked
+```
+# Latest version only (default)
+python galaxy_workflow_checker.py --source workflowhub --id 645 --versions latest
+
+# 3 most recent versions
+python galaxy_workflow_checker.py --source workflowhub --id 645 --versions 3
+
+# All versions
+python galaxy_workflow_checker.py --source workflowhub --id 645 --versions all
+
+# Specific version(s)
+python galaxy_workflow_checker.py --source dockstore \
+    --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" \
+    --versions v1.3
+python galaxy_workflow_checker.py --source dockstore \
+    --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" \
+    --versions v1.3,v1.2
+```
+
+Search both registries at once
+```
+python galaxy_workflow_checker.py --source both --search "VGP" --versions latest \
+    --output vgp_report
+```
+
+Output is saved as both `<output>.txt` (plain-text table) and `<output>.json`. The table lists
+each workflow, version, number of tools, and how many are missing in Galaxy Australia,
+with a detail section listing the missing tool IDs.
+
+Full list of options
+```
+python galaxy_workflow_checker.py --help
 ```
 
 REFERENCE
@@ -147,7 +241,10 @@ REFERENCE
 - Workflow Example on Dockstore
 	- [Assembly-decontamination-VGP9](https://dockstore.org/workflows/github.com/iwc-workflows/Assembly-decontamination-VGP9/main:main?tab=info)
 	- [Scaffolding-HiC-VGP8](https://dockstore.org/workflows/github.com/iwc-workflows/Scaffolding-HiC-VGP8/main:main?tab=info)
+- Workflow Example on WorkflowHub
+	- [Assembly-decontamination-VGP9](https://workflowhub.eu/workflows/645)
 - [Dockstore documentation](https://docs.dockstore.org/en/latest/launch-with/galaxy-launch-with.html)
 - [Browsing Workflow in Dockstore and Galaxy](https://docs.dockstore.org/en/latest/launch-with/galaxy-launch-with.html)
+- [WorkflowHub](https://workflowhub.eu)
 - GTN material
 	- [workflow automation](https://training.galaxyproject.org/training-material/topics/galaxy-interface/tutorials/workflow-automation/tutorial.html)
