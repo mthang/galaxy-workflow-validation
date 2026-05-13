@@ -713,16 +713,25 @@ def select_versions_workflowhub(versions: List[Dict], spec: str) -> List[Dict]:
       v1.3     → match by version name
       v1.3,v1.4 → multiple specific names
     """
+    def _is_real_release(v):
+        """Filter out junk WorkflowHub version entries (e.g. 'v2.0.6 - ignore', 'master @ abc123 - ignore')."""
+        name = v.get("name", "").lower()
+        return "ignore" not in name
+
     if spec == "latest":
-        return versions[-1:] if versions else []
+        releases = [v for v in versions if _is_real_release(v)]
+        candidates = releases if releases else versions
+        return candidates[-1:] if candidates else []
     if spec == "all":
         return versions
     try:
         n = int(spec)
         if n <= 0:
             print(f"  Warning: --versions must be a positive integer, got {n}; using latest")
-            return versions[-1:] if versions else []
-        return versions[-n:] if len(versions) >= n else versions
+            return select_versions_workflowhub(versions, "latest")
+        releases = [v for v in versions if _is_real_release(v)]
+        candidates = releases if releases else versions
+        return candidates[-n:] if len(candidates) >= n else candidates
     except ValueError:
         names = {v.strip().lower() for v in spec.split(",")}
         matched = [v for v in versions
@@ -730,7 +739,7 @@ def select_versions_workflowhub(versions: List[Dict], spec: str) -> List[Dict]:
                    or str(v.get("id", "")).lower() in names]
         if not matched:
             print(f"  Warning: no versions matched '{spec}', using latest")
-            return versions[-1:] if versions else []
+            return select_versions_workflowhub(versions, "latest")
         return matched
 
 
