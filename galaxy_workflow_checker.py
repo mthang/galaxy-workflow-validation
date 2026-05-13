@@ -1025,7 +1025,7 @@ def write_text_report(report: Dict, path: str):
         header = (f"{'Workflow':<{col_name}}  {'Source':<{col_src}}  "
                   f"{'Version':<{col_ver}}  "
                   f"{'Status':<{col_status}}  "
-                  f"{'Tools':>5}  {'Exact':>5}  {'Mism':>5}  {'Miss':>5}  "
+                  f"{'Tools':>5}  {'Exact':>5}  {'Mismatch':>8}  {'Missing':>7}  "
                   f"{'Wire':>4}  URL")
         lines.append("-" * (len(header) + 5))
         lines.append(header)
@@ -1038,8 +1038,8 @@ def write_text_report(report: Dict, path: str):
                 f"{r['workflow_status']:<{col_status}}  "
                 f"{r['total_tools']:>5}  "
                 f"{r['n_exact']:>5}  "
-                f"{r['n_version_mismatch']:>5}  "
-                f"{r['n_missing']:>5}  "
+                f"{r['n_version_mismatch']:>8}  "
+                f"{r['n_missing']:>7}  "
                 f"{r['n_wiring_issues']:>4}  "
                 f"{r['workflow_url']}"
             )
