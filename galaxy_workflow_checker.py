@@ -342,6 +342,42 @@ def extract_tools_from_ga(ga_path: Path) -> List[str]:
     return sorted(e["id"] for e in entries)
 
 
+def _version_tuple(v: str) -> tuple:
+    """
+    Convert a tool version string to a sortable tuple for comparison.
+    Strips +galaxyN suffix before parsing, e.g. '2.1.0+galaxy1' -> (2, 1, 0).
+    Non-numeric segments become 0.
+    """
+    base = v.split("+")[0]  # drop +galaxyN
+    parts = []
+    for seg in base.split("."):
+        try:
+            parts.append(int(seg))
+        except ValueError:
+            parts.append(0)
+    return tuple(parts) if parts else (0,)
+
+
+def _mismatch_direction(wanted: str, available: List[str]) -> str:
+    """
+    Given the version the workflow wants and the list of installed versions,
+    return a human-readable label describing the direction of the gap.
+
+    Returns one of:
+      "installed older"  — all installed versions are older than wanted
+      "installed newer"  — all installed versions are newer than wanted
+      "mixed"            — installed versions span both sides of wanted
+    """
+    wt = _version_tuple(wanted)
+    older = [v for v in available if _version_tuple(v) < wt]
+    newer = [v for v in available if _version_tuple(v) > wt]
+    if older and not newer:
+        return "installed older"
+    if newer and not older:
+        return "installed newer"
+    return "mixed"
+
+
 def check_tools(tool_entries: List, cache: Dict[str, set]) -> List[Dict]:
     """
     Classify each workflow tool against the Galaxy tool cache.
@@ -387,10 +423,12 @@ def check_tools(tool_entries: List, cache: Dict[str, set]) -> List[Dict]:
                 "status": "exact_match", "source": source,
             })
         else:
+            avail = sorted(cache[base])
             results.append({
                 "id": tid, "base": base, "version": version,
                 "status": "version_mismatch",
-                "available_versions": sorted(cache[base]),
+                "available_versions": avail,
+                "version_direction": _mismatch_direction(version, avail),
                 "source": source,
             })
     return results
@@ -930,7 +968,9 @@ def write_text_report(report: Dict, path: str):
                     src_tag = f" [{t['source']}]" if t.get("source", "parent") != "parent" else ""
                     if t["status"] == "version_mismatch":
                         avail = ", ".join(t.get("available_versions", []))
-                        lines.append(f"  MISMATCH{src_tag}  {t['base']}")
+                        direction = t.get("version_direction", "")
+                        dir_tag = f"  ({direction})" if direction else ""
+                        lines.append(f"  MISMATCH{src_tag}{dir_tag}  {t['base']}")
                         lines.append(f"            wants : {t['version']}")
                         lines.append(f"            avail : {avail}")
                     elif t["status"] == "missing":
