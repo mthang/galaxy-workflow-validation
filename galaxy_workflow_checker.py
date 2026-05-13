@@ -295,36 +295,23 @@ def check_wiring_gaps(workflow: Dict, source_label: str = "parent") -> List[Dict
         if not isinstance(input_connections, dict):
             input_connections = {}  # malformed — treat as empty
 
-        if not input_connections:
-            issues.append({
-                "step_id": step_id,
-                "step_label": step_label,
-                "tool_id": tool_id,
-                "source": source_label,
-                "severity": "WARN",
-                "message": (
-                    f"Step {step_id} ({step_label}): no input connections — "
-                    "relies entirely on hardcoded parameters or has no inputs"
-                ),
-            })
-        else:
-            for input_name, conns in input_connections.items():
-                if not isinstance(conns, list):
-                    conns = [conns] if conns else []
-                # Empty list = input declared but nothing connected
-                if not conns:
-                    issues.append({
-                        "step_id": step_id,
-                        "step_label": step_label,
-                        "tool_id": tool_id,
-                        "source": source_label,
-                        "input": input_name,
-                        "severity": "WARN",
-                        "message": (
-                            f"Step {step_id} ({step_label}) input '{input_name}': "
-                            "declared but not connected to any upstream step"
-                        ),
-                    })
+        for input_name, conns in input_connections.items():
+            if not isinstance(conns, list):
+                conns = [conns] if conns else []
+            # Empty list = input declared but nothing connected
+            if not conns:
+                issues.append({
+                    "step_id": step_id,
+                    "step_label": step_label,
+                    "tool_id": tool_id,
+                    "source": source_label,
+                    "input": input_name,
+                    "severity": "WARN",
+                    "message": (
+                        f"Step {step_id} ({step_label}) input '{input_name}': "
+                        "declared but not connected to any upstream step"
+                    ),
+                })
 
     # Recurse into subworkflow steps
     for step_id, step in steps.items():
