@@ -375,23 +375,24 @@ def _version_tuple(v: str) -> tuple:
     """
     Convert a tool version string to a sortable tuple for comparison.
 
-    Splits on '+' to separate the base version from the Galaxy suffix:
-      '2.1.0+galaxy1'   -> (2, 1, 0, 0, 1)
-      '0.7.17.5+galaxy3'-> (0, 7, 17, 5, 3)
-      '2.0+galaxy0'     -> (2, 0, 0, 0, 0)
-      '1.9.1'           -> (1, 9, 1, 0, 0)
+    Returns a 2-tuple (base_tuple, galaxy_n) for comparison, where base_tuple
+    is a variable-length tuple of integers and galaxy_n is the Galaxy patch int.
 
-    Base is always padded to exactly 4 integer segments so that tuples
-    from versions with different numbers of dot-segments compare correctly.
-    For example '0.7.17+galaxy999' -> (0,7,17,0,999) which correctly sorts
-    below '0.7.17.5+galaxy3' -> (0,7,17,5,3).
+      '2.1.0+galaxy1'    -> ((2, 1, 0), 1)
+      '0.7.17.5+galaxy3' -> ((0, 7, 17, 5), 3)
+      '2.0+galaxy0'      -> ((2, 0), 0)
+      '1.9.1'            -> ((1, 9, 1), 0)
+
+    Using a nested 2-tuple means base versions of any length compare correctly
+    via Python's natural tuple ordering: (0,7,17) < (0,7,17,5) is True, so
+    '0.7.17+galaxy999' < '0.7.17.5+galaxy0' as expected. No padding or
+    truncation is needed, so 5-segment versions like '0.7.17.5.1' work too.
 
     Only a 'galaxy<N>' suffix is treated as the Galaxy patch integer.
     Non-galaxy suffixes like '+rc2' produce galaxy_n=0.
     """
     if "+" in v:
         base, galaxy_part = v.split("+", 1)
-        # Only match 'galaxy<N>' — not '+rc2', '+0', etc.
         m = re.match(r"galaxy(\d+)$", galaxy_part)
         galaxy_n = int(m.group(1)) if m else 0
     else:
@@ -405,13 +406,7 @@ def _version_tuple(v: str) -> tuple:
         except ValueError:
             parts.append(0)
 
-    # Pad base to always 4 segments; truncate if longer (unusual)
-    while len(parts) < 4:
-        parts.append(0)
-    parts = parts[:4]
-
-    parts.append(galaxy_n)
-    return tuple(parts)
+    return (tuple(parts), galaxy_n)
 
 
 def _mismatch_direction(wanted: str, available: List[str]) -> str:
