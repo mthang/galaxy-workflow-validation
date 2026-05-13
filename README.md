@@ -255,6 +255,18 @@ MISMATCH  (installed older)  toolshed.g2.bx.psu.edu/repos/devteam/fastq_groomer/
 
 The results table includes a `Wire` column showing the count of wiring warnings per workflow version.
 
+Check a local `.ga` file directly (no registry fetch needed)
+```
+# Static checks only — no Galaxy credentials required
+python galaxy_workflow_checker.py --local-file myworkflow.ga --static-only
+
+# Full check (static + tool availability) — requires Galaxy credentials
+python galaxy_workflow_checker.py --local-file myworkflow.ga --profile galaxy_profile
+
+# Set a version label in the report (default is "local")
+python galaxy_workflow_checker.py --local-file myworkflow.ga --static-only --version-label v1.0.0
+```
+
 Full list of options
 ```
 python galaxy_workflow_checker.py --help

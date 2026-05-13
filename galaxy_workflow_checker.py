@@ -1066,16 +1066,32 @@ def parse_args():
     # Flags
     parser.add_argument("--list-only", action="store_true",
                         help="List matching workflows without checking tools")
+    parser.add_argument("--local-file", metavar="PATH",
+                        help="Check a local .ga file directly instead of fetching from a registry. "
+                             "All static checks and (if credentials are available) tool availability "
+                             "checks are run. Use --version-label to set the version shown in the report.")
+    parser.add_argument("--version-label", default="local",
+                        help="Version label to use in the report when checking a local file "
+                             "(default: local). Only used with --local-file.")
+    parser.add_argument("--static-only", action="store_true",
+                        help="Run only the static checks (structural consistency and wiring gaps). "
+                             "Skip the Galaxy tool availability check. No Galaxy credentials needed. "
+                             "Only used with --local-file.")
 
     args = parser.parse_args()
 
     # Validate combinations
+    if args.local_file:
+        if not Path(args.local_file).exists():
+            parser.error(f"--local-file: file not found: {args.local_file}")
+        return args  # skip registry-mode validation
+
     if args.source == "workflowhub" and args.entry:
         parser.error("--entry is for Dockstore workflows; use --id for WorkflowHub")
     if args.source == "dockstore" and args.id:
         parser.error("--id is for WorkflowHub workflows; use --entry for Dockstore")
     if not any([args.search, args.id, args.entry]):
-        parser.error("Provide at least one of: --search, --id, --entry")
+        parser.error("Provide at least one of: --search, --id, --entry (or use --local-file)")
 
     return args
 
@@ -1113,6 +1129,63 @@ def main():
             print(f"\nDockstore {args.entry}: {len(versions)} version(s)")
             for v in versions:
                 print(f"  {v}")
+        return
+
+    # --- Local file mode ---
+    if args.local_file:
+        ga_path = Path(args.local_file)
+        # Derive a display name from the filename
+        wf_name = ga_path.stem
+
+        if args.static_only:
+            # Static checks only — no Galaxy connection needed
+            print(f"\nStatic-only check: {ga_path}")
+            structural_issues, wf_dict = check_structural_consistency(ga_path)
+            structural_fails = [i for i in structural_issues if i["severity"] == "FAIL"]
+            print("\nStructural consistency:")
+            if not structural_issues:
+                print("  PASS")
+            for issue in structural_issues:
+                print(f"  [{issue['severity']}] {issue['check']}: {issue['message']}")
+            if wf_dict and not structural_fails:
+                wiring = check_wiring_gaps(wf_dict)
+                print("\nWiring gaps:")
+                if not wiring:
+                    print("  PASS")
+                for w in wiring:
+                    print(f"  [{w['severity']}] {w['message']}")
+                tools = _extract_tools_from_dict(wf_dict)
+                print(f"\nToolShed tools found: {len(tools)}")
+                for t in tools:
+                    src = f" [{t['source']}]" if t['source'] != 'parent' else ''
+                    print(f"  {t['id']}{src}")
+            else:
+                print("\n(Wiring and tool checks skipped — structural FAIL)")
+            return
+
+        # Full check (static + tool availability)
+        galaxy_url, galaxy_key = read_planemo_profile(args.profile)
+        print(f"Galaxy URL : {galaxy_url}")
+        print(f"Profile    : {args.profile}")
+        tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+
+        workflow_info = {"name": wf_name, "id": wf_name, "url": str(ga_path.resolve())}
+        result = check_workflow_version(
+            source="local",
+            workflow_info=workflow_info,
+            version_label=args.version_label,
+            ga_path=ga_path,
+            tool_cache=tool_cache,
+        )
+        all_results = [result]
+        report = generate_report(all_results, galaxy_url, args.profile)
+        display_summary(report)
+        json_path = args.output + ".json"
+        txt_path  = args.output + ".txt"
+        with open(json_path, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"JSON report  : {json_path}")
+        write_text_report(report, txt_path)
         return
 
     # --- Tool checking mode ---
