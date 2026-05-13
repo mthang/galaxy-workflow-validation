@@ -1095,8 +1095,10 @@ def write_text_report(report: Dict, path: str):
                         lines.append(f"    {galaxy_name} doesn't have the tool version specified in the workflow")
                         lines.append(f"    Workflow wants : {t['version']}")
                         lines.append(f"    {galaxy_name} has  : {avail} ({dir_note})")
+                        lines.append("")
                     elif t["status"] == "missing":
                         lines.append(f"  MISSING{src_tag}   {t['id']}")
+                        lines.append("")
 
                 # Wiring issues
                 for w in r.get("wiring_issues", []):
