@@ -52,6 +52,19 @@ WORKFLOWHUB_TRS_BASE = "https://workflowhub.eu/ga4gh/trs/v2"
 WORKFLOWHUB_BASE = "https://workflowhub.eu"
 DOCKSTORE_BASE = "https://dockstore.org"
 
+# Friendly names for known Galaxy instances
+GALAXY_INSTANCE_NAMES = {
+    "usegalaxy.org.au":        "Galaxy Australia",
+    "genome.usegalaxy.org.au": "Galaxy Australia",
+    "usegalaxy.org":           "Galaxy Main",
+    "usegalaxy.eu":            "Galaxy Europe",
+}
+
+def galaxy_instance_name(url: str) -> str:
+    """Return a friendly name for a Galaxy URL, or the URL itself if unknown."""
+    host = url.rstrip("/").split("//")[-1].split("/")[0]
+    return GALAXY_INSTANCE_NAMES.get(host, url)
+
 
 # ---------------------------------------------------------------------------
 # Credentials
@@ -1064,15 +1077,24 @@ def write_text_report(report: Dict, path: str):
                                  "built-in Galaxy tools, or tool_id fields may be missing.")
 
                 # Tool issues
+                galaxy_name = galaxy_instance_name(report.get("galaxy_url", ""))
                 for t in r["tool_statuses"]:
                     src_tag = f" [{t['source']}]" if t.get("source", "parent") != "parent" else ""
                     if t["status"] == "version_mismatch":
                         avail = ", ".join(t.get("available_versions", []))
                         direction = t.get("version_direction", "")
-                        dir_tag = f"  ({direction})" if direction else ""
-                        lines.append(f"  MISMATCH{src_tag}{dir_tag}  {t['base']}")
-                        lines.append(f"            wants : {t['version']}")
-                        lines.append(f"            avail : {avail}")
+                        if direction == "installed older":
+                            dir_note = f"only older versions available on {galaxy_name}"
+                        elif direction == "installed newer":
+                            dir_note = f"only newer versions available on {galaxy_name}"
+                        elif direction == "mixed":
+                            dir_note = f"older and newer versions available on {galaxy_name}, but not this exact version"
+                        else:
+                            dir_note = f"exact version not available on {galaxy_name}"
+                        lines.append(f"  MISMATCH{src_tag}  {t['base']}")
+                        lines.append(f"    {galaxy_name} doesn't have the tool version specified in the workflow")
+                        lines.append(f"    Workflow wants : {t['version']}")
+                        lines.append(f"    {galaxy_name} has  : {avail} ({dir_note})")
                     elif t["status"] == "missing":
                         lines.append(f"  MISSING{src_tag}   {t['id']}")
 
