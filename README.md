@@ -224,37 +224,6 @@ python galaxy_workflow_checker.py --source both --search "VGP" --versions latest
     --output vgp_report
 ```
 
-Output is saved as both `<output>.txt` (plain-text table) and `<output>.json`. The table lists
-each workflow, version, number of tools, and how many are missing or mismatched in Galaxy Australia,
-with a detail section listing blockers.
-
-**Static checks** — run automatically on every downloaded `.ga` file before the tool check:
-
-- **Structural consistency** — checks the file is a valid Galaxy workflow: required fields present (`uuid`, `name`, `steps`, `a_galaxy_workflow`), UUID is a valid format (not null or malformed), every connection points to a step that actually exists, and `steps` is a dict. If this check fails, the tool check is skipped.
-- **Wiring gaps** — flags any tool step that has no input connections at all. Reported as `WARN` (not `FAIL`) because without querying the tool XML we can't confirm whether those inputs are required.
-- **Subworkflow tools** — if the workflow embeds subworkflows, their tools are found too and labelled by subworkflow step name in the report.
-
-**Version mismatch direction** — when a tool version does not match, the report notes whether the installed version is older or newer than what the workflow requires, e.g. `MISMATCH  (installed older)`.
-
-Example output for a workflow with a structural error:
-```
-STRUCTURAL  [FAIL] connection_ref: Step 2 input 'input_file' references non-existent step 9999
-```
-
-Example output for a wiring warning:
-```
-WIRING      [WARN] Step 2 (fastq_to_fasta): no input connections — relies entirely on hardcoded parameters or has no inputs
-```
-
-Example output for a version mismatch:
-```
-MISMATCH  (installed older)  toolshed.g2.bx.psu.edu/repos/devteam/fastq_groomer/fastq_groomer
-  wants : 1.1.5+galaxy2
-  avail : 1.0.4+galaxy0, 1.1.1+galaxy1
-```
-
-The results table includes a `Wire` column showing the count of wiring warnings per workflow version.
-
 Check a local `.ga` file directly (no registry fetch needed)
 ```
 # Static checks only — no Galaxy credentials required
@@ -267,10 +236,63 @@ python galaxy_workflow_checker.py --local-file myworkflow.ga --profile galaxy_pr
 python galaxy_workflow_checker.py --local-file myworkflow.ga --static-only --version-label v1.0.0
 ```
 
+All flags
+```
+--source          workflowhub / dockstore / both
+--id              WorkflowHub workflow ID
+--entry           Dockstore entry path
+--search          Keyword to search for matching workflows
+--versions        latest (default) / all / N / specific version(s) comma-separated
+--list-only       List matching workflows without checking tools
+--local-file      Path to a local .ga file
+--static-only     Structural and wiring checks only — no Galaxy connection needed
+--version-label   Version label for a local file run (default: local)
+--output          Base name for output files (creates .txt and .json)
+--profile         Planemo profile name (default: galaxy_profile)
+```
+
 Full list of options
 ```
 python galaxy_workflow_checker.py --help
 ```
+
+Output is saved as both `<output>.txt` (plain-text table) and `<output>.json`. The table lists
+each workflow, version, number of tools, and how many are missing or mismatched in Galaxy Australia,
+with a detail section listing blockers.
+
+**Static checks** — run automatically on every `.ga` file before the tool check:
+
+- **Structural consistency** — checks the file is a valid Galaxy workflow: required fields present (`uuid`, `name`, `steps`, `a_galaxy_workflow`), UUID is a valid format (not null or malformed), every connection points to a step that actually exists, and `steps` is a dict. If this check fails, the tool check is skipped.
+- **Wiring gaps** — flags any input slot that is declared in `input_connections` but has nothing connected to it. Reported as `WARN` (not `FAIL`). Steps with no input connections at all are not flagged, as they may use hardcoded parameters or fetch data externally.
+- **Subworkflow tools** — if the workflow embeds subworkflows, their tools are found too and labelled by subworkflow step name in the report.
+
+**Version mismatch** — when a tool version does not match, the report names the Galaxy server explicitly and notes whether only older or only newer versions are available.
+
+Example output for a structural error:
+```
+STRUCTURAL  [FAIL] connection_ref: Step 2 input 'input_file' references non-existent step 9999
+```
+
+Example output for a wiring warning:
+```
+WIRING  [WARN] Step 2 (fastq_to_fasta) input 'input_file': declared but not connected to any upstream step
+```
+
+Example output for a version mismatch:
+```
+MISMATCH  toolshed.g2.bx.psu.edu/repos/devteam/fastq_groomer/fastq_groomer
+  Galaxy Australia doesn't have the tool version specified in the workflow
+  Workflow wants : 1.1.5+galaxy2
+  Galaxy Australia has  : 1.0.4+galaxy0, 1.1.1+galaxy1 (only older versions available on Galaxy Australia)
+```
+
+Status values in the results table:
+- `ready` — all tools installed at the exact version the workflow specifies
+- `version_mismatch` — all tools installed but at least one is at the wrong version
+- `missing_tool` — at least one tool is not installed on Galaxy at all
+- `wiring_issues` — tools are fine but at least one declared input is not connected
+- `no_toolshed_tools` — no ToolShed tools in the workflow; tool check skipped
+- `structural_error` — the workflow file has a structural problem; tool check skipped
 
 REFERENCE
 - IWC workflow
