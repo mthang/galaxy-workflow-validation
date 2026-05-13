@@ -134,13 +134,17 @@ def check_structural_consistency(ga_path: Path) -> Tuple[List[Dict], Optional[Di
     """
     issues = []
 
-    # 1. JSON parseable
+    # 1. JSON parseable and a dict
     try:
         with open(ga_path) as f:
             workflow = json.load(f)
     except (json.JSONDecodeError, OSError) as e:
         issues.append({"check": "parse", "severity": "FAIL",
                        "message": f"Cannot parse .ga file: {e}"})
+        return issues, None
+    if not isinstance(workflow, dict):
+        issues.append({"check": "parse", "severity": "FAIL",
+                       "message": f"Expected a JSON object at top level, got {type(workflow).__name__}"})
         return issues, None
 
     # 2. Galaxy workflow marker
@@ -191,7 +195,12 @@ def check_structural_consistency(ga_path: Path) -> Tuple[List[Dict], Optional[Di
         valid_ids_str = set(steps_dict.keys())
         valid_ids_int = {int(k) for k in steps_dict.keys() if str(k).isdigit()}
         for step_id, step in steps_dict.items():
-            for input_name, conns in step.get("input_connections", {}).items():
+            if not isinstance(step, dict):
+                continue  # null or malformed step — structural issue, skip
+            input_connections = step.get("input_connections", {})
+            if not isinstance(input_connections, dict):
+                continue  # malformed input_connections — skip safely
+            for input_name, conns in input_connections.items():
                 if not isinstance(conns, list):
                     conns = [conns] if conns else []
                 for conn in conns:
@@ -249,6 +258,8 @@ def check_wiring_gaps(workflow: Dict, source_label: str = "parent") -> List[Dict
         return issues  # structural check will have caught this already
 
     for step_id, step in steps.items():
+        if not isinstance(step, dict):
+            continue  # null or malformed step
         step_type = step.get("type", "tool")
         if step_type in _SKIP_TYPES:
             continue
@@ -268,6 +279,8 @@ def check_wiring_gaps(workflow: Dict, source_label: str = "parent") -> List[Dict
         step_label = raw_label or f"step_{step_id}"
 
         input_connections = step.get("input_connections", {})
+        if not isinstance(input_connections, dict):
+            input_connections = {}  # malformed — treat as empty
 
         if not input_connections:
             issues.append({
@@ -302,9 +315,11 @@ def check_wiring_gaps(workflow: Dict, source_label: str = "parent") -> List[Dict
 
     # Recurse into subworkflow steps
     for step_id, step in steps.items():
+        if not isinstance(step, dict):
+            continue
         if step.get("type") == "subworkflow":
             subwf = step.get("subworkflow", {})
-            if subwf:
+            if isinstance(subwf, dict):  # guard against non-dict subworkflow value
                 sub_label = step.get("label") or f"subworkflow_{step_id}"
                 issues.extend(check_wiring_gaps(subwf, source_label=sub_label))
 
@@ -327,13 +342,15 @@ def _extract_tools_from_dict(workflow: Dict,
     if not isinstance(steps, dict):
         return []  # structural check will have caught this already
     for step in steps.values():
+        if not isinstance(step, dict):
+            continue  # null or malformed step
         tool_id = step.get("tool_id")
         if tool_id and "toolshed.g2.bx.psu.edu" in tool_id:
             if tool_id not in seen:
                 seen[tool_id] = source_label
         if step.get("type") == "subworkflow":
             subwf = step.get("subworkflow", {})
-            if subwf:
+            if isinstance(subwf, dict):  # guard against non-dict subworkflow value
                 sub_label = step.get("label") or f"subworkflow_{step.get('id', '?')}"
                 for entry in _extract_tools_from_dict(subwf, source_label=sub_label):
                     if entry["id"] not in seen:
@@ -357,28 +374,42 @@ def extract_tools_from_ga(ga_path: Path) -> List[str]:
 def _version_tuple(v: str) -> tuple:
     """
     Convert a tool version string to a sortable tuple for comparison.
-    Handles the Galaxy +galaxyN suffix by appending it as a final integer,
-    so '2.0+galaxy0' -> (2, 0, 0) and '2.0+galaxy3' -> (2, 0, 3).
-    This means same-base-version galaxy-patch differences compare correctly
-    instead of both resolving to the same tuple and producing 'mixed'.
-    Non-numeric segments become 0.
+
+    Splits on '+' to separate the base version from the Galaxy suffix:
+      '2.1.0+galaxy1' -> base='2.1.0', galaxy_n=1  -> (2, 1, 0, 1)
+      '2.0+galaxy0'   -> base='2.0',   galaxy_n=0  -> (2, 0, 0, 0, 0)  [padded]
+      '1.9.1'         -> base='1.9.1', galaxy_n=0  -> (1, 9, 1, 0)
+
+    Base segments are padded to 3 parts so tuples from different base depths
+    compare correctly (e.g. '2.0' and '2.0.1' both get 3-part bases).
+    The galaxy suffix integer always occupies position 3 (index -1).
+
+    Only the leading digits of the galaxy suffix are used (e.g. 'galaxy1beta2'
+    extracts 1, not 12 or 102).
     """
     if "+" in v:
         base, galaxy_part = v.split("+", 1)
-        # galaxy_part is e.g. "galaxy3" — extract the trailing number
-        galaxy_n = re.sub(r"[^0-9]", "", galaxy_part)
-        galaxy_n = int(galaxy_n) if galaxy_n else 0
+        # Extract only the leading integer from the galaxy suffix
+        m = re.match(r"[a-zA-Z]*(\d+)", galaxy_part)
+        galaxy_n = int(m.group(1)) if m else 0
     else:
         base = v
         galaxy_n = 0
+
     parts = []
     for seg in base.split("."):
         try:
             parts.append(int(seg))
         except ValueError:
             parts.append(0)
+
+    # Pad base to always have 3 segments so tuples from '2.0' and '2.0.1'
+    # compare correctly regardless of galaxy_n position
+    while len(parts) < 3:
+        parts.append(0)
+
     parts.append(galaxy_n)
-    return tuple(parts) if parts else (0,)
+    return tuple(parts)
 
 
 def _mismatch_direction(wanted: str, available: List[str]) -> str:
@@ -392,8 +423,13 @@ def _mismatch_direction(wanted: str, available: List[str]) -> str:
       "mixed"            — installed versions span both sides of wanted
     """
     wt = _version_tuple(wanted)
-    older = [v for v in available if _version_tuple(v) < wt]
-    newer = [v for v in available if _version_tuple(v) > wt]
+    older  = [v for v in available if _version_tuple(v) < wt]
+    newer  = [v for v in available if _version_tuple(v) > wt]
+    equal  = [v for v in available if _version_tuple(v) == wt]
+    if equal:
+        # At least one installed version parses as the same — shouldn't reach
+        # this function (exact_match would have been set), but handle gracefully
+        return "unknown"
     if older and not newer:
         return "installed older"
     if newer and not older:
@@ -899,7 +935,14 @@ def generate_report(results: List[Dict], galaxy_url: str, profile: str) -> Dict:
         "versions_structural_error": sum(
             1 for r in results if r["workflow_status"] == "structural_error"
         ),
-        "versions_wiring_issues": sum(
+        "versions_wiring_issues_only": sum(
+            1 for r in results if r["workflow_status"] == "wiring_issues"
+        ),
+        "versions_no_toolshed_tools": sum(
+            1 for r in results if r["workflow_status"] == "no_toolshed_tools"
+        ),
+        # Cross-cutting: any result that has wiring warnings regardless of overall status
+        "versions_with_wiring_warnings": sum(
             1 for r in results if r.get("wiring_issues")
         ),
         "unique_missing_tools": missing_tools,
@@ -924,9 +967,11 @@ def write_text_report(report: Dict, path: str):
     lines.append(f"Unique workflows              : {report['unique_workflows']}")
     lines.append(f"Ready to run (all exact)      : {report['versions_ready']}")
     lines.append(f"Structural errors             : {report['versions_structural_error']}")
-    lines.append(f"Wiring issues (warnings)      : {report['versions_wiring_issues']}")
+    lines.append(f"Wiring warnings only          : {report['versions_wiring_issues_only']}")
+    lines.append(f"No ToolShed tools found       : {report['versions_no_toolshed_tools']}")
     lines.append(f"Blocked by version mismatch   : {report['versions_version_mismatch']}")
     lines.append(f"Blocked by missing tool       : {report['versions_missing_tool']}")
+    lines.append(f"(Any wiring warnings)         : {report['versions_with_wiring_warnings']}")
     lines.append(f"Unique mismatched tools       : {report['unique_mismatched_tools_count']}")
     lines.append(f"Unique missing tools          : {report['unique_missing_tools_count']}")
     lines.append("")
@@ -935,11 +980,11 @@ def write_text_report(report: Dict, path: str):
     if not results:
         lines.append("No results.")
     else:
-        col_name = max((len(r["workflow_name"]) for r in results), default=20)
+        col_name = max((len(str(r["workflow_name"] or "")) for r in results), default=20)
         col_name = max(col_name, len("Workflow"))
-        col_src  = max((len(r["source"]) for r in results), default=10)
+        col_src  = max((len(str(r["source"] or "")) for r in results), default=10)
         col_src  = max(col_src, len("Source"))
-        col_ver  = max((len(str(r["version"])) for r in results), default=9)
+        col_ver  = max((len(str(r["version"] or "")) for r in results), default=9)
         col_ver  = max(col_ver, len("Version"))
         col_status = max((len(r["workflow_status"]) for r in results), default=10)
         col_status = max(col_status, len("Status"))
@@ -955,9 +1000,9 @@ def write_text_report(report: Dict, path: str):
         lines.append("-" * (len(header) + 5))
         for r in results:
             lines.append(
-                f"{r['workflow_name']:<{col_name}}  "
-                f"{r['source']:<{col_src}}  "
-                f"{str(r['version']):<{col_ver}}  "
+                f"{str(r['workflow_name'] or ''):<{col_name}}  "
+                f"{str(r['source'] or ''):<{col_src}}  "
+                f"{str(r['version'] or ''):<{col_ver}}  "
                 f"{r['workflow_status']:<{col_status}}  "
                 f"{r['total_tools']:>5}  "
                 f"{r['n_exact']:>5}  "
@@ -1040,9 +1085,11 @@ def display_summary(report: Dict):
     print(f"  Unique workflows              : {report['unique_workflows']}")
     print(f"  Ready to run (all exact)      : {report['versions_ready']}")
     print(f"  Structural errors             : {report['versions_structural_error']}")
-    print(f"  Wiring issues (warnings)      : {report['versions_wiring_issues']}")
+    print(f"  Wiring warnings only          : {report['versions_wiring_issues_only']}")
+    print(f"  No ToolShed tools found       : {report['versions_no_toolshed_tools']}")
     print(f"  Blocked by version mismatch   : {report['versions_version_mismatch']}")
     print(f"  Blocked by missing tool       : {report['versions_missing_tool']}")
+    print(f"  (Any wiring warnings)         : {report['versions_with_wiring_warnings']}")
     print(f"  Unique mismatched tools       : {report['unique_mismatched_tools_count']}")
     print(f"  Unique missing tools          : {report['unique_missing_tools_count']}")
     print("=" * 60)
