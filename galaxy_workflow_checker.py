@@ -178,7 +178,7 @@ def check_structural_consistency(ga_path: Path) -> Tuple[List[Dict], Optional[Di
                 "message": f"Malformed workflow UUID: '{wf_uuid}'",
             })
 
-    # 5. Step connection IDs reference valid steps
+    # 5. Step connection IDs reference valid steps (parent + subworkflows)
     steps = workflow.get("steps", {})
     if not isinstance(steps, dict):
         issues.append({
@@ -186,27 +186,39 @@ def check_structural_consistency(ga_path: Path) -> Tuple[List[Dict], Optional[Di
             "message": f"'steps' field must be a dict, got {type(steps).__name__}",
         })
         return issues, workflow
-    valid_ids_str = set(steps.keys())
-    valid_ids_int = {int(k) for k in steps.keys() if str(k).isdigit()}
 
-    for step_id, step in steps.items():
-        for input_name, conns in step.get("input_connections", {}).items():
-            if not isinstance(conns, list):
-                conns = [conns] if conns else []
-            for conn in conns:
-                if not isinstance(conn, dict):
-                    continue
-                src = conn.get("id")
-                if src is None:
-                    continue
-                if str(src) not in valid_ids_str and src not in valid_ids_int:
-                    issues.append({
-                        "check": "connection_ref", "severity": "FAIL",
-                        "message": (
-                            f"Step {step_id} input '{input_name}' "
-                            f"references non-existent step {src}"
-                        ),
-                    })
+    def _check_connections(steps_dict: dict, source_label: str = "parent"):
+        valid_ids_str = set(steps_dict.keys())
+        valid_ids_int = {int(k) for k in steps_dict.keys() if str(k).isdigit()}
+        for step_id, step in steps_dict.items():
+            for input_name, conns in step.get("input_connections", {}).items():
+                if not isinstance(conns, list):
+                    conns = [conns] if conns else []
+                for conn in conns:
+                    if not isinstance(conn, dict):
+                        continue
+                    src = conn.get("id")
+                    if src is None:
+                        continue
+                    if str(src) not in valid_ids_str and src not in valid_ids_int:
+                        loc = f" [in {source_label}]" if source_label != "parent" else ""
+                        issues.append({
+                            "check": "connection_ref", "severity": "FAIL",
+                            "message": (
+                                f"Step {step_id} input '{input_name}' "
+                                f"references non-existent step {src}{loc}"
+                            ),
+                        })
+            # Recurse into embedded subworkflows
+            if step.get("type") == "subworkflow":
+                subwf = step.get("subworkflow", {})
+                if isinstance(subwf, dict):
+                    sub_steps = subwf.get("steps", {})
+                    if isinstance(sub_steps, dict):
+                        sub_label = step.get("label") or f"subworkflow_{step_id}"
+                        _check_connections(sub_steps, source_label=sub_label)
+
+    _check_connections(steps)
 
     return issues, workflow
 

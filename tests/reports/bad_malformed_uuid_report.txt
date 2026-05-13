@@ -1,13 +1,7 @@
-Galaxy Workflow Checker — Static Check Test Report
-Test case   : bad_malformed_uuid
-File        : tests/bad_malformed_uuid.ga
-Description : Expected: FAIL — UUID is not a valid format
 
---- Structural Consistency ---
+Static-only check: tests/bad_malformed_uuid.ga
+
+Structural consistency:
   [FAIL] uuid_format: Malformed workflow UUID: 'not-a-real-uuid'
 
---- Wiring Gaps ---
-  PASS — no wiring gaps detected
-
---- Tools ---
-  ToolShed tools found: 13
+(Wiring and tool checks skipped — structural FAIL)
