@@ -376,21 +376,23 @@ def _version_tuple(v: str) -> tuple:
     Convert a tool version string to a sortable tuple for comparison.
 
     Splits on '+' to separate the base version from the Galaxy suffix:
-      '2.1.0+galaxy1' -> base='2.1.0', galaxy_n=1  -> (2, 1, 0, 1)
-      '2.0+galaxy0'   -> base='2.0',   galaxy_n=0  -> (2, 0, 0, 0, 0)  [padded]
-      '1.9.1'         -> base='1.9.1', galaxy_n=0  -> (1, 9, 1, 0)
+      '2.1.0+galaxy1'   -> (2, 1, 0, 0, 1)
+      '0.7.17.5+galaxy3'-> (0, 7, 17, 5, 3)
+      '2.0+galaxy0'     -> (2, 0, 0, 0, 0)
+      '1.9.1'           -> (1, 9, 1, 0, 0)
 
-    Base segments are padded to 3 parts so tuples from different base depths
-    compare correctly (e.g. '2.0' and '2.0.1' both get 3-part bases).
-    The galaxy suffix integer always occupies position 3 (index -1).
+    Base is always padded to exactly 4 integer segments so that tuples
+    from versions with different numbers of dot-segments compare correctly.
+    For example '0.7.17+galaxy999' -> (0,7,17,0,999) which correctly sorts
+    below '0.7.17.5+galaxy3' -> (0,7,17,5,3).
 
-    Only the leading digits of the galaxy suffix are used (e.g. 'galaxy1beta2'
-    extracts 1, not 12 or 102).
+    Only a 'galaxy<N>' suffix is treated as the Galaxy patch integer.
+    Non-galaxy suffixes like '+rc2' produce galaxy_n=0.
     """
     if "+" in v:
         base, galaxy_part = v.split("+", 1)
-        # Extract only the leading integer from the galaxy suffix
-        m = re.match(r"[a-zA-Z]*(\d+)", galaxy_part)
+        # Only match 'galaxy<N>' — not '+rc2', '+0', etc.
+        m = re.match(r"galaxy(\d+)$", galaxy_part)
         galaxy_n = int(m.group(1)) if m else 0
     else:
         base = v
@@ -403,10 +405,10 @@ def _version_tuple(v: str) -> tuple:
         except ValueError:
             parts.append(0)
 
-    # Pad base to always have 3 segments so tuples from '2.0' and '2.0.1'
-    # compare correctly regardless of galaxy_n position
-    while len(parts) < 3:
+    # Pad base to always 4 segments; truncate if longer (unusual)
+    while len(parts) < 4:
         parts.append(0)
+    parts = parts[:4]
 
     parts.append(galaxy_n)
     return tuple(parts)
@@ -722,6 +724,9 @@ def select_versions_workflowhub(versions: List[Dict], spec: str) -> List[Dict]:
         return versions
     try:
         n = int(spec)
+        if n <= 0:
+            print(f"  Warning: --versions must be a positive integer, got {n}; using latest")
+            return versions[-1:] if versions else []
         return versions[-n:] if len(versions) >= n else versions
     except ValueError:
         names = {v.strip().lower() for v in spec.split(",")}
@@ -734,24 +739,43 @@ def select_versions_workflowhub(versions: List[Dict], spec: str) -> List[Dict]:
         return matched
 
 
+_DOCKSTORE_BRANCH_NAMES = {"main", "master", "develop", "dev"}
+
+
+def _dockstore_release_versions(versions: List[str]) -> List[str]:
+    """Filter out branch names (main, master etc.) leaving only tagged releases."""
+    return [v for v in versions if v.lower() not in _DOCKSTORE_BRANCH_NAMES]
+
+
 def select_versions_dockstore(versions: List[str], spec: str) -> List[str]:
     """
     Select Dockstore versions based on spec.
     Dockstore lists newest first, so 'latest' = versions[0].
+    Branch names (main, master) are excluded from 'latest' and N-most-recent
+    selections since they point to the unreleased dev tip, not a stable release.
+    Explicit version name requests (e.g. --versions main) are honoured as-is.
     """
     if spec == "latest":
-        return versions[:1] if versions else []
+        releases = _dockstore_release_versions(versions)
+        candidates = releases if releases else versions
+        return candidates[:1] if candidates else []
     if spec == "all":
         return versions
     try:
         n = int(spec)
-        return versions[:n]
+        if n <= 0:
+            print(f"  Warning: --versions must be a positive integer, got {n}; using latest")
+            return select_versions_dockstore(versions, "latest")
+        releases = _dockstore_release_versions(versions)
+        candidates = releases if releases else versions
+        return candidates[:n]
     except ValueError:
+        # Specific version name(s) — honour as-is, including branch names
         names = {v.strip() for v in spec.split(",")}
         matched = [v for v in versions if v in names]
         if not matched:
             print(f"  Warning: no versions matched '{spec}', using latest")
-            return versions[:1] if versions else []
+            return select_versions_dockstore(versions, "latest")
         return matched
 
 
@@ -806,15 +830,19 @@ def check_workflow_version(source: str, workflow_info: Dict, version_label: str,
     mismatch = [t for t in classified if t["status"] == "version_mismatch"]
     missing  = [t for t in classified if t["status"] == "missing"]
 
-    # Overall status: tool issues take precedence over wiring warnings
-    if not classified:
-        workflow_status = "no_toolshed_tools"
-    elif missing:
+    # Overall status precedence:
+    # tool errors > wiring warnings > no_toolshed_tools > ready
+    # Wiring is checked before no_toolshed_tools so a workflow built entirely
+    # from built-in Galaxy tools with broken wiring is not silently reported
+    # as "no_toolshed_tools" with the wiring problems hidden.
+    if missing:
         workflow_status = "missing_tool"
     elif mismatch:
         workflow_status = "version_mismatch"
     elif wiring_issues:
         workflow_status = "wiring_issues"
+    elif not classified:
+        workflow_status = "no_toolshed_tools"
     else:
         workflow_status = "ready"
 
