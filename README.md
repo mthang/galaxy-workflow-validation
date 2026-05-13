@@ -225,8 +225,35 @@ python galaxy_workflow_checker.py --source both --search "VGP" --versions latest
 ```
 
 Output is saved as both `<output>.txt` (plain-text table) and `<output>.json`. The table lists
-each workflow, version, number of tools, and how many are missing in Galaxy Australia,
-with a detail section listing the missing tool IDs.
+each workflow, version, number of tools, and how many are missing or mismatched in Galaxy Australia,
+with a detail section listing blockers.
+
+**Static checks** — run automatically on every downloaded `.ga` file before the tool check:
+
+- **Structural consistency** — checks the file is a valid Galaxy workflow: required fields present (`uuid`, `name`, `steps`, `a_galaxy_workflow`), UUID is a valid format (not null or malformed), every connection points to a step that actually exists, and `steps` is a dict. If this check fails, the tool check is skipped.
+- **Wiring gaps** — flags any tool step that has no input connections at all. Reported as `WARN` (not `FAIL`) because without querying the tool XML we can't confirm whether those inputs are required.
+- **Subworkflow tools** — if the workflow embeds subworkflows, their tools are found too and labelled by subworkflow step name in the report.
+
+**Version mismatch direction** — when a tool version does not match, the report notes whether the installed version is older or newer than what the workflow requires, e.g. `MISMATCH  (installed older)`.
+
+Example output for a workflow with a structural error:
+```
+STRUCTURAL  [FAIL] connection_ref: Step 2 input 'input_file' references non-existent step 9999
+```
+
+Example output for a wiring warning:
+```
+WIRING      [WARN] Step 2 (fastq_to_fasta): no input connections — relies entirely on hardcoded parameters or has no inputs
+```
+
+Example output for a version mismatch:
+```
+MISMATCH  (installed older)  toolshed.g2.bx.psu.edu/repos/devteam/fastq_groomer/fastq_groomer
+  wants : 1.1.5+galaxy2
+  avail : 1.0.4+galaxy0, 1.1.1+galaxy1
+```
+
+The results table includes a `Wire` column showing the count of wiring warnings per workflow version.
 
 Full list of options
 ```
