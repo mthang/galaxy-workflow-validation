@@ -1,0 +1,145 @@
+{
+  "generated": "2026-05-13T17:46:06.492814",
+  "galaxy_url": "https://usegalaxy.org.au",
+  "profile": "galaxy_profile",
+  "strict_version_matching": true,
+  "total_versions_checked": 3,
+  "unique_workflows": 1,
+  "versions_ready": 3,
+  "versions_version_mismatch": 0,
+  "versions_missing_tool": 0,
+  "versions_structural_error": 0,
+  "versions_wiring_issues": 0,
+  "unique_missing_tools": [],
+  "unique_missing_tools_count": 0,
+  "unique_mismatched_tools": [],
+  "unique_mismatched_tools_count": 0,
+  "results": [
+    {
+      "source": "workflowhub",
+      "workflow_name": "Repeat masking - TSI",
+      "workflow_id": "875",
+      "workflow_url": "https://workflowhub.eu/workflows/875",
+      "version": "Version 1",
+      "timestamp": "2026-05-13T17:46:04.360001",
+      "total_tools": 3,
+      "n_exact": 3,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/csbl/repeatmodeler/repeatmodeler/2.0.4+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/csbl/repeatmodeler/repeatmodeler",
+          "version": "2.0.4+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/repeat_masker/repeatmasker_wrapper/4.1.5+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/repeat_masker/repeatmasker_wrapper",
+          "version": "4.1.5+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/9.3+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "9.3+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_875/v1/Galaxy-Workflow-Repeat-masking-TSI.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Repeat masking - TSI",
+      "workflow_id": "875",
+      "workflow_url": "https://workflowhub.eu/workflows/875",
+      "version": "Version 1.1",
+      "timestamp": "2026-05-13T17:46:05.413860",
+      "total_tools": 3,
+      "n_exact": 3,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/csbl/repeatmodeler/repeatmodeler/2.0.4+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/csbl/repeatmodeler/repeatmodeler",
+          "version": "2.0.4+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/repeat_masker/repeatmasker_wrapper/4.1.5+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/repeat_masker/repeatmasker_wrapper",
+          "version": "4.1.5+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/9.3+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "9.3+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_875/v2/Galaxy-Workflow-Repeat-masking-TSI.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Repeat masking - TSI",
+      "workflow_id": "875",
+      "workflow_url": "https://workflowhub.eu/workflows/875",
+      "version": "Version 3",
+      "timestamp": "2026-05-13T17:46:06.492774",
+      "total_tools": 3,
+      "n_exact": 3,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/csbl/repeatmodeler/repeatmodeler/2.0.4+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/csbl/repeatmodeler/repeatmodeler",
+          "version": "2.0.4+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/repeat_masker/repeatmasker_wrapper/4.1.5+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/repeat_masker/repeatmasker_wrapper",
+          "version": "4.1.5+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/9.3+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "9.3+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_875/v3/Galaxy-Workflow-Repeat_masking_-_TSI-updated.ga"
+    }
+  ]
+}

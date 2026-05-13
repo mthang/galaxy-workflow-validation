@@ -1,0 +1,1251 @@
+{
+  "generated": "2026-05-13T17:45:55.475728",
+  "galaxy_url": "https://usegalaxy.org.au",
+  "profile": "galaxy_profile",
+  "strict_version_matching": true,
+  "total_versions_checked": 11,
+  "unique_workflows": 1,
+  "versions_ready": 11,
+  "versions_version_mismatch": 0,
+  "versions_missing_tool": 0,
+  "versions_structural_error": 0,
+  "versions_wiring_issues": 0,
+  "unique_missing_tools": [],
+  "unique_missing_tools_count": 0,
+  "unique_mismatched_tools": [],
+  "unique_mismatched_tools_count": 0,
+  "results": [
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v1.0.0",
+      "timestamp": "2026-05-13T17:45:44.642315",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v1/Galaxy-Workflow-Genome_assessment_post_assembly_v1.0.0.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v1.1.0",
+      "timestamp": "2026-05-13T17:45:45.716006",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v2/Galaxy-Workflow-Genome_assessment_post_assembly_v1.1.0.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v2.0.2",
+      "timestamp": "2026-05-13T17:45:46.771264",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v3/Galaxy-Workflow-Genome_assessment_post_assembly_v2.0.0.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v2.0.4",
+      "timestamp": "2026-05-13T17:45:47.877898",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v4/Galaxy-Workflow-Genome_assessment_post_assembly.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v2.0.5",
+      "timestamp": "2026-05-13T17:45:49.801991",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v5/Galaxy-Workflow-Genome_assessment_post_assembly.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v2.0.6 - ignore",
+      "timestamp": "2026-05-13T17:45:50.833785",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v6/Galaxy-Workflow-Genome_assessment_post_assembly.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v2.0.6 - ignore",
+      "timestamp": "2026-05-13T17:45:51.803889",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v7/Galaxy-Workflow-Genome_assessment_post_assembly.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "master @ 0154e28 - ignore",
+      "timestamp": "2026-05-13T17:45:52.709206",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v8/Galaxy-Workflow-Genome_assessment_post_assembly.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v2.0.6",
+      "timestamp": "2026-05-13T17:45:53.612194",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v9/Galaxy-Workflow-Genome_assessment_post_assembly.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v2.0.7",
+      "timestamp": "2026-05-13T17:45:54.530058",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v10/Galaxy-Workflow-Genome_assessment_post_assembly.ga"
+    },
+    {
+      "source": "workflowhub",
+      "workflow_name": "Genome-assessment-post-assembly",
+      "workflow_id": "403",
+      "workflow_url": "https://workflowhub.eu/workflows/403",
+      "version": "v2.0.8",
+      "timestamp": "2026-05-13T17:45:55.475634",
+      "total_tools": 13,
+      "n_exact": 13,
+      "n_version_mismatch": 0,
+      "n_missing": 0,
+      "n_wiring_issues": 0,
+      "n_structural_issues": 0,
+      "workflow_status": "ready",
+      "ready_to_run": true,
+      "structural_issues": [],
+      "wiring_issues": [],
+      "tool_statuses": [
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python/1.1.5",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/fastqtofasta/fastq_to_fasta_python",
+          "version": "1.1.5",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl/1.3+galaxy6",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/meryl/meryl",
+          "version": "1.3+galaxy6",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/fasta_stats/fasta-stats",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast/5.0.2+galaxy1",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/quast/quast",
+          "version": "5.0.2+galaxy1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco/5.4.6+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/busco/busco",
+          "version": "5.4.6+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury/1.3+galaxy4",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/merqury/merqury",
+          "version": "1.3+galaxy4",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_grep_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool/1.1.1",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_sed_tool",
+          "version": "1.1.1",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular/3.3.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/filter_tabular/filter_tabular",
+          "version": "3.3.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file/0.1.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/add_line_to_file/add_line_to_file",
+          "version": "0.1.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose/1.8+galaxy0",
+          "base": "toolshed.g2.bx.psu.edu/repos/iuc/datamash_transpose/datamash_transpose",
+          "version": "1.8+galaxy0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1/2.0",
+          "base": "toolshed.g2.bx.psu.edu/repos/devteam/column_maker/Add_a_column1",
+          "version": "2.0",
+          "status": "exact_match",
+          "source": "parent"
+        },
+        {
+          "id": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column/1.1.3",
+          "base": "toolshed.g2.bx.psu.edu/repos/bgruening/text_processing/tp_replace_in_column",
+          "version": "1.1.3",
+          "status": "exact_match",
+          "source": "parent"
+        }
+      ],
+      "ga_path": "workflow_workspace/workflowhub_403/v11/Galaxy-Workflow-Genome_assessment_post_assembly.ga"
+    }
+  ]
+}

@@ -1,0 +1,13 @@
+Galaxy Workflow Checker — Static Check Test Report
+Test case   : bad_missing_field
+File        : tests/bad_missing_field.ga
+Description : Expected: FAIL — required 'uuid' field is absent
+
+--- Structural Consistency ---
+  [FAIL] required_field: Missing required top-level field: 'uuid'
+
+--- Wiring Gaps ---
+  PASS — no wiring gaps detected
+
+--- Tools ---
+  ToolShed tools found: 13

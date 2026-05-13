@@ -1,0 +1,13 @@
+Galaxy Workflow Checker — Static Check Test Report
+Test case   : bad_broken_connection
+File        : tests/bad_broken_connection.ga
+Description : Expected: FAIL — connection references non-existent step
+
+--- Structural Consistency ---
+  [FAIL] connection_ref: Step 2 input 'input_file' references non-existent step 9999
+
+--- Wiring Gaps ---
+  PASS — no wiring gaps detected
+
+--- Tools ---
+  ToolShed tools found: 13

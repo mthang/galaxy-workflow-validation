@@ -1,0 +1,13 @@
+Galaxy Workflow Checker — Static Check Test Report
+Test case   : bad_wiring_gap
+File        : tests/bad_wiring_gap.ga
+Description : Expected: WARN — tool step has no input connections
+
+--- Structural Consistency ---
+  PASS — no structural issues
+
+--- Wiring Gaps ---
+  [WARN] Step 2 (fastq_to_fasta_python): no input connections — relies entirely on hardcoded parameters or has no inputs
+
+--- Tools ---
+  ToolShed tools found: 13
