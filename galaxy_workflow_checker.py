@@ -345,16 +345,27 @@ def extract_tools_from_ga(ga_path: Path) -> List[str]:
 def _version_tuple(v: str) -> tuple:
     """
     Convert a tool version string to a sortable tuple for comparison.
-    Strips +galaxyN suffix before parsing, e.g. '2.1.0+galaxy1' -> (2, 1, 0).
+    Handles the Galaxy +galaxyN suffix by appending it as a final integer,
+    so '2.0+galaxy0' -> (2, 0, 0) and '2.0+galaxy3' -> (2, 0, 3).
+    This means same-base-version galaxy-patch differences compare correctly
+    instead of both resolving to the same tuple and producing 'mixed'.
     Non-numeric segments become 0.
     """
-    base = v.split("+")[0]  # drop +galaxyN
+    if "+" in v:
+        base, galaxy_part = v.split("+", 1)
+        # galaxy_part is e.g. "galaxy3" — extract the trailing number
+        galaxy_n = re.sub(r"[^0-9]", "", galaxy_part)
+        galaxy_n = int(galaxy_n) if galaxy_n else 0
+    else:
+        base = v
+        galaxy_n = 0
     parts = []
     for seg in base.split("."):
         try:
             parts.append(int(seg))
         except ValueError:
             parts.append(0)
+    parts.append(galaxy_n)
     return tuple(parts) if parts else (0,)
 
 
@@ -1081,6 +1092,8 @@ def parse_args():
     args = parser.parse_args()
 
     # Validate combinations
+    if args.static_only and not args.local_file:
+        parser.error("--static-only requires --local-file")
     if args.local_file:
         if not Path(args.local_file).exists():
             parser.error(f"--local-file: file not found: {args.local_file}")
