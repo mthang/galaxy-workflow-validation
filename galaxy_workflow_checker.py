@@ -479,7 +479,7 @@ def check_tools(tool_entries: List, cache: Dict[str, set]) -> List[Dict]:
                 "status": "exact_match", "source": source,
             })
         else:
-            avail = sorted(cache[base])
+            avail = sorted(cache[base], key=_version_tuple)
             results.append({
                 "id": tid, "base": base, "version": version,
                 "status": "version_mismatch",

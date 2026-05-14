@@ -1,5 +1,5 @@
 Galaxy Workflow Tool Checker (strict version matching)
-Generated : 2026-05-13T17:45:55.475728
+Generated : 2026-05-13T20:49:35.855824
 Galaxy    : https://usegalaxy.org.au
 Profile   : galaxy_profile
 
@@ -9,9 +9,11 @@ Versions checked              : 11
 Unique workflows              : 1
 Ready to run (all exact)      : 11
 Structural errors             : 0
-Wiring issues (warnings)      : 0
+Wiring warnings only          : 0
+No ToolShed tools found       : 0
 Blocked by version mismatch   : 0
 Blocked by missing tool       : 0
+(Any wiring warnings)         : 0
 Unique mismatched tools       : 0
 Unique missing tools          : 0
 
