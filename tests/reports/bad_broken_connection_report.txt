@@ -1,0 +1,7 @@
+
+Static-only check: tests/bad_broken_connection.ga
+
+Structural consistency:
+  [FAIL] connection_ref: Step 2 input 'input_file' references non-existent step 9999
+
+(Wiring and tool checks skipped — structural FAIL)

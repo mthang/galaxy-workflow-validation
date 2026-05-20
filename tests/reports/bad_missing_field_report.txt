@@ -1,0 +1,7 @@
+
+Static-only check: tests/bad_missing_field.ga
+
+Structural consistency:
+  [FAIL] required_field: Missing required top-level field: 'uuid'
+
+(Wiring and tool checks skipped — structural FAIL)

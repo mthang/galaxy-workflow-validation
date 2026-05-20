@@ -1,0 +1,39 @@
+Galaxy Workflow Tool Checker (strict version matching)
+Generated : 2026-05-13T20:49:35.855824
+Galaxy    : https://usegalaxy.org.au
+Profile   : galaxy_profile
+
+Summary
+----------------------------------------
+Versions checked              : 11
+Unique workflows              : 1
+Ready to run (all exact)      : 11
+Structural errors             : 0
+Wiring warnings only          : 0
+No ToolShed tools found       : 0
+Blocked by version mismatch   : 0
+Blocked by missing tool       : 0
+(Any wiring warnings)         : 0
+Unique mismatched tools       : 0
+Unique missing tools          : 0
+
+Results
+---------------------------------------------------------------------------------------------------------------------------
+Workflow                         Source       Version                    Status  Tools  Exact   Mism   Miss  Wire  URL
+---------------------------------------------------------------------------------------------------------------------------
+Genome-assessment-post-assembly  workflowhub  v1.0.0                     ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v1.1.0                     ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v2.0.2                     ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v2.0.4                     ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v2.0.5                     ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v2.0.6 - ignore            ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v2.0.6 - ignore            ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  master @ 0154e28 - ignore  ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v2.0.6                     ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v2.0.7                     ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+Genome-assessment-post-assembly  workflowhub  v2.0.8                     ready      13     13      0      0     0  https://workflowhub.eu/workflows/403
+
+Note: wiring issues are reported as WARN — without querying the
+Galaxy tool XML the checker cannot confirm whether unconnected
+inputs are required or optional.
+

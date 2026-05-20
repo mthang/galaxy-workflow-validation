@@ -1,0 +1,7 @@
+
+Static-only check: tests/bad_malformed_uuid.ga
+
+Structural consistency:
+  [FAIL] uuid_format: Malformed workflow UUID: 'not-a-real-uuid'
+
+(Wiring and tool checks skipped — structural FAIL)

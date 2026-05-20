@@ -1,0 +1,13 @@
+Galaxy Workflow Checker — Static Check Test Report
+Test case   : good_workflow
+File        : tests/good_workflow.ga
+Description : Expected: PASS — no structural or wiring issues
+
+--- Structural Consistency ---
+  PASS — no structural issues
+
+--- Wiring Gaps ---
+  PASS — no wiring gaps detected
+
+--- Tools ---
+  ToolShed tools found: 13

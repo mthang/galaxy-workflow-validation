@@ -1,0 +1,29 @@
+Galaxy Workflow Tool Checker (strict version matching)
+Generated : 2026-05-13T17:46:06.492814
+Galaxy    : https://usegalaxy.org.au
+Profile   : galaxy_profile
+
+Summary
+----------------------------------------
+Versions checked              : 3
+Unique workflows              : 1
+Ready to run (all exact)      : 3
+Structural errors             : 0
+Wiring issues (warnings)      : 0
+Blocked by version mismatch   : 0
+Blocked by missing tool       : 0
+Unique mismatched tools       : 0
+Unique missing tools          : 0
+
+Results
+--------------------------------------------------------------------------------------------------
+Workflow              Source       Version      Status  Tools  Exact   Mism   Miss  Wire  URL
+--------------------------------------------------------------------------------------------------
+Repeat masking - TSI  workflowhub  Version 1    ready       3      3      0      0     0  https://workflowhub.eu/workflows/875
+Repeat masking - TSI  workflowhub  Version 1.1  ready       3      3      0      0     0  https://workflowhub.eu/workflows/875
+Repeat masking - TSI  workflowhub  Version 3    ready       3      3      0      0     0  https://workflowhub.eu/workflows/875
+
+Note: wiring issues are reported as WARN — without querying the
+Galaxy tool XML the checker cannot confirm whether unconnected
+inputs are required or optional.
+

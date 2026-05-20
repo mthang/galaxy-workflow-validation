@@ -30,7 +30,7 @@ import re
 import subprocess
 import argparse
 from pathlib import Path
-from typing import List, Dict, Optional, Tuple, Union, Any
+from typing import List, Dict, Optional, Tuple, Union, Any, Set
 from datetime import datetime
 
 try:
@@ -51,6 +51,19 @@ except ImportError:
 WORKFLOWHUB_TRS_BASE = "https://workflowhub.eu/ga4gh/trs/v2"
 WORKFLOWHUB_BASE = "https://workflowhub.eu"
 DOCKSTORE_BASE = "https://dockstore.org"
+
+# Friendly names for known Galaxy instances
+GALAXY_INSTANCE_NAMES = {
+    "usegalaxy.org.au":        "Galaxy Australia",
+    "genome.usegalaxy.org.au": "Galaxy Australia",
+    "usegalaxy.org":           "Galaxy Main",
+    "usegalaxy.eu":            "Galaxy Europe",
+}
+
+def galaxy_instance_name(url: str) -> str:
+    """Return a friendly name for a Galaxy URL, or the URL itself if unknown."""
+    host = url.rstrip("/").split("//")[-1].split("/")[0]
+    return GALAXY_INSTANCE_NAMES.get(host, url)
 
 
 # ---------------------------------------------------------------------------
@@ -81,11 +94,12 @@ def read_planemo_profile(profile_name: str) -> Tuple[str, str]:
 # Galaxy tool cache
 # ---------------------------------------------------------------------------
 
-def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> set:
+def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> Dict[str, set]:
     """
-    Fetch all tools installed in Galaxy and return a set of base tool IDs
-    (without version suffix) for fast lookup.
+    Fetch all tools installed in Galaxy and return a mapping of
+    base tool ID -> set of installed versions.
     Base ID format: toolshed.g2.bx.psu.edu/repos/{owner}/{repo}/{toolname}
+    Version format: {x.y.z}+galaxyN (or whatever suffix convention is used)
     """
     if not BIOBLEND_AVAILABLE:
         print("Error: BioBlend required for Galaxy tool checking.")
@@ -97,56 +111,383 @@ def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> set:
     except Exception as e:
         print(f"Error: Could not retrieve tools from Galaxy: {e}")
         sys.exit(1)
-    cache = set()
+    cache: Dict[str, set] = {}
     for t in tools:
         tid = t.get("id", "")
         if "toolshed" in tid:
-            # Strip version: keep first 5 path components
-            # e.g. toolshed.g2.bx.psu.edu/repos/owner/repo/toolname
+            # toolshed.g2.bx.psu.edu/repos/owner/repo/toolname/version
             parts = tid.split("/")
-            if len(parts) >= 5:
-                cache.add("/".join(parts[:5]))
-    print(f"  Found {len(tools)} tools installed ({len(cache)} ToolShed tools)")
+            if len(parts) >= 6:
+                base = "/".join(parts[:5])
+                version = parts[5]
+                cache.setdefault(base, set()).add(version)
+    print(f"  Found {len(tools)} tools installed ({len(cache)} unique ToolShed tools)")
     return cache
 
 
 # ---------------------------------------------------------------------------
-# Tool extraction from .ga file
+# Structural consistency check
 # ---------------------------------------------------------------------------
+
+UUID_RE = re.compile(
+    r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',
+    re.IGNORECASE,
+)
+
+def check_structural_consistency(ga_path: Path) -> Tuple[List[Dict], Optional[Dict]]:
+    """
+    Parse a .ga file and check for structural issues before any other check.
+
+    Returns (issues, workflow_dict).
+    - If the file cannot be parsed, workflow_dict is None and further checks
+      should be skipped.
+    - Each issue is a dict: {check, severity, message}
+      severity: "FAIL" = hard error that will prevent import/run,
+                "WARN" = advisory only.
+    """
+    issues = []
+
+    # 1. JSON parseable and a dict
+    try:
+        with open(ga_path) as f:
+            workflow = json.load(f)
+    except (json.JSONDecodeError, OSError) as e:
+        issues.append({"check": "parse", "severity": "FAIL",
+                       "message": f"Cannot parse .ga file: {e}"})
+        return issues, None
+    if not isinstance(workflow, dict):
+        issues.append({"check": "parse", "severity": "FAIL",
+                       "message": f"Expected a JSON object at top level, got {type(workflow).__name__}"})
+        return issues, None
+
+    # 2. Galaxy workflow marker
+    has_marker = (
+        workflow.get("a_galaxy_workflow") == "true"
+        or workflow.get("a_galaxy_workflow") is True
+        or workflow.get("class") == "GalaxyWorkflow"
+    )
+    if not has_marker:
+        issues.append({
+            "check": "galaxy_marker", "severity": "FAIL",
+            "message": "Missing a_galaxy_workflow=true or class=GalaxyWorkflow",
+        })
+
+    # 3. Required top-level fields
+    for field in ("steps", "uuid", "name"):
+        if field not in workflow:
+            issues.append({
+                "check": "required_field", "severity": "FAIL",
+                "message": f"Missing required top-level field: '{field}'",
+            })
+
+    # 4. UUID format — skip if uuid field is absent (already flagged above) or null
+    raw_uuid = workflow.get("uuid")
+    if raw_uuid is None and "uuid" in workflow:
+        issues.append({
+            "check": "uuid_format", "severity": "FAIL",
+            "message": "Workflow UUID is null",
+        })
+    elif raw_uuid is not None:
+        wf_uuid = str(raw_uuid)
+        if not UUID_RE.match(wf_uuid):
+            issues.append({
+                "check": "uuid_format", "severity": "FAIL",
+                "message": f"Malformed workflow UUID: '{wf_uuid}'",
+            })
+
+    # 5. Step connection IDs reference valid steps (parent + subworkflows)
+    steps = workflow.get("steps", {})
+    if not isinstance(steps, dict):
+        issues.append({
+            "check": "steps_type", "severity": "FAIL",
+            "message": f"'steps' field must be a dict, got {type(steps).__name__}",
+        })
+        return issues, workflow
+
+    def _check_connections(steps_dict: dict, source_label: str = "parent"):
+        valid_ids_str = set(steps_dict.keys())
+        valid_ids_int = {int(k) for k in steps_dict.keys() if str(k).isdigit()}
+        for step_id, step in steps_dict.items():
+            if not isinstance(step, dict):
+                continue  # null or malformed step — structural issue, skip
+            input_connections = step.get("input_connections", {})
+            if not isinstance(input_connections, dict):
+                continue  # malformed input_connections — skip safely
+            for input_name, conns in input_connections.items():
+                if not isinstance(conns, list):
+                    conns = [conns] if conns else []
+                for conn in conns:
+                    if not isinstance(conn, dict):
+                        continue
+                    src = conn.get("id")
+                    if src is None:
+                        continue
+                    if str(src) not in valid_ids_str and src not in valid_ids_int:
+                        loc = f" [in {source_label}]" if source_label != "parent" else ""
+                        issues.append({
+                            "check": "connection_ref", "severity": "FAIL",
+                            "message": (
+                                f"Step {step_id} input '{input_name}' "
+                                f"references non-existent step {src}{loc}"
+                            ),
+                        })
+            # Recurse into embedded subworkflows
+            if step.get("type") == "subworkflow":
+                subwf = step.get("subworkflow", {})
+                if isinstance(subwf, dict):
+                    sub_steps = subwf.get("steps", {})
+                    if isinstance(sub_steps, dict):
+                        sub_label = step.get("label") or f"subworkflow_{step_id}"
+                        _check_connections(sub_steps, source_label=sub_label)
+
+    _check_connections(steps)
+
+    return issues, workflow
+
+
+# ---------------------------------------------------------------------------
+# Wiring gaps check
+# ---------------------------------------------------------------------------
+
+_SKIP_TYPES = {"data_input", "data_collection_input", "parameter_input", "pause"}
+
+
+def check_wiring_gaps(workflow: Dict, source_label: str = "parent") -> List[Dict]:
+    """
+    Check tool steps for missing or empty input connections.
+
+    Without querying the Galaxy tool XML we cannot determine which inputs are
+    required vs optional, so all flagged steps are reported as WARN.  The
+    caller should note this limitation in the report.
+
+    Also recurses into embedded subworkflows.
+
+    Returns a list of issue dicts: {step_id, step_label, tool_id, source,
+    severity, message}
+    """
+    issues = []
+    steps = workflow.get("steps", {})
+    if not isinstance(steps, dict):
+        return issues  # structural check will have caught this already
+
+    for step_id, step in steps.items():
+        if not isinstance(step, dict):
+            continue  # null or malformed step
+        step_type = step.get("type", "tool")
+        if step_type in _SKIP_TYPES:
+            continue
+        if step_type == "subworkflow":
+            # recurse — handled below
+            continue
+
+        tool_id = step.get("tool_id", "")
+        if not tool_id:
+            continue  # skip steps with no tool_id (e.g. pause steps)
+
+        # Derive a human-readable step label
+        raw_label = step.get("label") or ""
+        if not raw_label and "/" in tool_id:
+            # use the tool name segment from the toolshed ID
+            raw_label = tool_id.split("/")[-2]
+        step_label = raw_label or f"step_{step_id}"
+
+        input_connections = step.get("input_connections", {})
+        if not isinstance(input_connections, dict):
+            input_connections = {}  # malformed — treat as empty
+
+        for input_name, conns in input_connections.items():
+            if not isinstance(conns, list):
+                conns = [conns] if conns else []
+            # Empty list = input declared but nothing connected
+            if not conns:
+                issues.append({
+                    "step_id": step_id,
+                    "step_label": step_label,
+                    "tool_id": tool_id,
+                    "source": source_label,
+                    "input": input_name,
+                    "severity": "WARN",
+                    "message": (
+                        f"Step {step_id} ({step_label}) input '{input_name}': "
+                        "declared but not connected to any upstream step"
+                    ),
+                })
+
+    # Recurse into subworkflow steps
+    for step_id, step in steps.items():
+        if not isinstance(step, dict):
+            continue
+        if step.get("type") == "subworkflow":
+            subwf = step.get("subworkflow", {})
+            if isinstance(subwf, dict):  # guard against non-dict subworkflow value
+                sub_label = step.get("label") or f"subworkflow_{step_id}"
+                issues.extend(check_wiring_gaps(subwf, source_label=sub_label))
+
+    return issues
+
+
+# ---------------------------------------------------------------------------
+# Tool extraction from .ga file (with subworkflow recursion)
+# ---------------------------------------------------------------------------
+
+def _extract_tools_from_dict(workflow: Dict,
+                              source_label: str = "parent") -> List[Dict]:
+    """
+    Recursively extract ToolShed tool IDs from a workflow dict, including any
+    embedded subworkflows.  Returns a list of {id, source} dicts where source
+    is "parent" for the top-level workflow or the subworkflow label.
+    """
+    seen: Dict[str, str] = {}  # id -> source (first occurrence wins)
+    steps = workflow.get("steps", {})
+    if not isinstance(steps, dict):
+        return []  # structural check will have caught this already
+    for step in steps.values():
+        if not isinstance(step, dict):
+            continue  # null or malformed step
+        tool_id = step.get("tool_id")
+        if tool_id and "toolshed.g2.bx.psu.edu" in tool_id:
+            if tool_id not in seen:
+                seen[tool_id] = source_label
+        if step.get("type") == "subworkflow":
+            subwf = step.get("subworkflow", {})
+            if isinstance(subwf, dict):  # guard against non-dict subworkflow value
+                sub_label = step.get("label") or f"subworkflow_{step.get('id', '?')}"
+                for entry in _extract_tools_from_dict(subwf, source_label=sub_label):
+                    if entry["id"] not in seen:
+                        seen[entry["id"]] = entry["source"]
+    return [{"id": tid, "source": src} for tid, src in seen.items()]
+
 
 def extract_tools_from_ga(ga_path: Path) -> List[str]:
     """
     Parse a Galaxy workflow (.ga) file and return a deduplicated sorted list
     of ToolShed tool IDs required by the workflow steps.
     Built-in Galaxy tools (no toolshed URL) are skipped.
+    Includes tools from embedded subworkflows.
     """
     with open(ga_path) as f:
         workflow = json.load(f)
-    tools = set()
-    steps = workflow.get("steps", {})
-    for step in steps.values():
-        tool_id = step.get("tool_id")
-        if tool_id and "toolshed.g2.bx.psu.edu" in tool_id:
-            tools.add(tool_id)
-    return sorted(tools)
+    entries = _extract_tools_from_dict(workflow)
+    return sorted(e["id"] for e in entries)
 
 
-def check_tools(tool_ids: List[str], cache: set) -> Tuple[List[str], List[str]]:
+def _version_tuple(v: str) -> tuple:
     """
-    Given a list of tool IDs from a workflow and a set of installed base IDs,
-    return (present, missing) lists.
-    Matching is done on the base ID (without version) so that a newer installed
-    version still counts as present.
+    Convert a tool version string to a sortable tuple for comparison.
+
+    Returns a 2-tuple (base_tuple, galaxy_n) for comparison, where base_tuple
+    is a variable-length tuple of integers and galaxy_n is the Galaxy patch int.
+
+      '2.1.0+galaxy1'    -> ((2, 1, 0), 1)
+      '0.7.17.5+galaxy3' -> ((0, 7, 17, 5), 3)
+      '2.0+galaxy0'      -> ((2, 0), 0)
+      '1.9.1'            -> ((1, 9, 1), 0)
+
+    Using a nested 2-tuple means base versions of any length compare correctly
+    via Python's natural tuple ordering: (0,7,17) < (0,7,17,5) is True, so
+    '0.7.17+galaxy999' < '0.7.17.5+galaxy0' as expected. No padding or
+    truncation is needed, so 5-segment versions like '0.7.17.5.1' work too.
+
+    Only a 'galaxy<N>' suffix is treated as the Galaxy patch integer.
+    Non-galaxy suffixes like '+rc2' produce galaxy_n=0.
     """
-    present, missing = [], []
-    for tid in tool_ids:
-        parts = tid.split("/")
-        base = "/".join(parts[:5]) if len(parts) >= 5 else tid
-        if base in cache:
-            present.append(tid)
+    if "+" in v:
+        base, galaxy_part = v.split("+", 1)
+        m = re.match(r"galaxy(\d+)$", galaxy_part)
+        galaxy_n = int(m.group(1)) if m else 0
+    else:
+        base = v
+        galaxy_n = 0
+
+    parts = []
+    for seg in base.split("."):
+        try:
+            parts.append(int(seg))
+        except ValueError:
+            parts.append(0)
+
+    return (tuple(parts), galaxy_n)
+
+
+def _mismatch_direction(wanted: str, available: List[str]) -> str:
+    """
+    Given the version the workflow wants and the list of installed versions,
+    return a human-readable label describing the direction of the gap.
+
+    Returns one of:
+      "installed older"  — all installed versions are older than wanted
+      "installed newer"  — all installed versions are newer than wanted
+      "mixed"            — installed versions span both sides of wanted
+    """
+    wt = _version_tuple(wanted)
+    older  = [v for v in available if _version_tuple(v) < wt]
+    newer  = [v for v in available if _version_tuple(v) > wt]
+    equal  = [v for v in available if _version_tuple(v) == wt]
+    if equal:
+        # At least one installed version parses as the same — shouldn't reach
+        # this function (exact_match would have been set), but handle gracefully
+        return "unknown"
+    if older and not newer:
+        return "installed older"
+    if newer and not older:
+        return "installed newer"
+    return "mixed"
+
+
+def check_tools(tool_entries: List, cache: Dict[str, set]) -> List[Dict]:
+    """
+    Classify each workflow tool against the Galaxy tool cache.
+    Strict version matching: a tool is exact_match only if the exact
+    versioned ID (including +galaxyN suffix) is installed.
+
+    tool_entries: list of tool ID strings OR {id, source} dicts.
+
+    Returns a list of dicts, one per tool, with:
+      id       -- full versioned tool ID as found in the workflow
+      base     -- base tool ID (no version)
+      version  -- version string from the workflow (may be None)
+      status   -- "exact_match" | "version_mismatch" | "missing" | "unversioned"
+      source   -- "parent" or subworkflow label
+      available_versions -- sorted list of installed versions (version_mismatch only)
+    """
+    results = []
+    for entry in tool_entries:
+        if isinstance(entry, dict):
+            tid = entry["id"]
+            source = entry.get("source", "parent")
         else:
-            missing.append(tid)
-    return present, missing
+            tid = entry
+            source = "parent"
+
+        parts = tid.split("/")
+        if len(parts) < 6:
+            results.append({
+                "id": tid, "base": tid, "version": None,
+                "status": "unversioned", "source": source,
+            })
+            continue
+        base = "/".join(parts[:5])
+        version = parts[5]
+        if base not in cache:
+            results.append({
+                "id": tid, "base": base, "version": version,
+                "status": "missing", "source": source,
+            })
+        elif version in cache[base]:
+            results.append({
+                "id": tid, "base": base, "version": version,
+                "status": "exact_match", "source": source,
+            })
+        else:
+            avail = sorted(cache[base], key=_version_tuple)
+            results.append({
+                "id": tid, "base": base, "version": version,
+                "status": "version_mismatch",
+                "available_versions": avail,
+                "version_direction": _mismatch_direction(version, avail),
+                "source": source,
+            })
+    return results
 
 
 # ---------------------------------------------------------------------------
@@ -268,8 +609,37 @@ def search_dockstore(pattern: str, max_results: int = 10) -> List[Dict]:
     return workflows[:max_results]
 
 
+DOCKSTORE_TRS_BASE = "https://dockstore.org/api/ga4gh/trs/v2"
+
+
+def _dockstore_trs_get(path: str) -> Any:
+    """GET request to the Dockstore TRS API."""
+    url = DOCKSTORE_TRS_BASE + path
+    req = urllib.request.Request(url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=30) as resp:
+            return json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        print(f"  HTTP {e.code} for {url}")
+        return None
+    except Exception as e:
+        print(f"  Request error: {e}")
+        return None
+
+
+def _dockstore_tool_id(entry: str) -> str:
+    """Convert a Dockstore entry path to a URL-encoded TRS tool ID."""
+    return urllib.parse.quote(f"#workflow/{entry}", safe="")
+
+
 def get_dockstore_versions(entry: str) -> List[str]:
-    """Return list of version tags for a Dockstore workflow, newest first."""
+    """Return version names for a Dockstore workflow via TRS API, newest first.
+    Falls back to the CLI if the API call fails."""
+    tool_id = _dockstore_tool_id(entry)
+    data = _dockstore_trs_get(f"/tools/{tool_id}")
+    if data and data.get("versions"):
+        return [v["name"] for v in data["versions"] if "GALAXY" in v.get("descriptor_type", [])]
+    # CLI fallback
     cmd = ["dockstore", "workflow", "info", "--entry", entry]
     try:
         result = subprocess.run(cmd, capture_output=True, text=True)
@@ -287,11 +657,30 @@ def get_dockstore_versions(entry: str) -> List[str]:
 
 def download_dockstore_ga(entry: str, version: str,
                            workspace: Path) -> Optional[Path]:
-    """Download a Galaxy workflow .ga file from Dockstore."""
+    """Download a Galaxy workflow .ga file from Dockstore via TRS API.
+    Falls back to the CLI if the API call fails."""
     safe = entry.replace("/", "_").replace(":", "_").replace(".", "_")
     dest_dir = workspace / f"dockstore_{safe}" / version
     dest_dir.mkdir(parents=True, exist_ok=True)
 
+    # Try TRS API first (version name goes directly in path, not the full #workflow/... id)
+    tool_id = _dockstore_tool_id(entry)
+    ver_id  = urllib.parse.quote(version, safe="")
+    descriptor = _dockstore_trs_get(f"/tools/{tool_id}/versions/{ver_id}/GALAXY/descriptor")
+    if descriptor and "content" in descriptor:
+        content = descriptor["content"]
+        try:
+            parsed = json.loads(content)
+        except json.JSONDecodeError:
+            parsed = {}
+        raw_name = (parsed.get("name") or f"workflow_{version}").strip()
+        ga_filename = raw_name.replace("/", "_") + ".ga"
+        ga_path = dest_dir / ga_filename
+        with open(ga_path, "w") as f:
+            f.write(content)
+        return ga_path
+
+    # CLI fallback
     cmd = ["dockstore", "workflow", "download",
            "--entry", f"{entry}:{version}",
            "--descriptor", "all",
@@ -324,13 +713,25 @@ def select_versions_workflowhub(versions: List[Dict], spec: str) -> List[Dict]:
       v1.3     → match by version name
       v1.3,v1.4 → multiple specific names
     """
+    def _is_real_release(v):
+        """Filter out junk WorkflowHub version entries (e.g. 'v2.0.6 - ignore', 'master @ abc123 - ignore')."""
+        name = v.get("name", "").lower()
+        return "ignore" not in name
+
     if spec == "latest":
-        return versions[-1:] if versions else []
+        releases = [v for v in versions if _is_real_release(v)]
+        candidates = releases if releases else versions
+        return candidates[-1:] if candidates else []
     if spec == "all":
         return versions
     try:
         n = int(spec)
-        return versions[-n:] if len(versions) >= n else versions
+        if n <= 0:
+            print(f"  Warning: --versions must be a positive integer, got {n}; using latest")
+            return select_versions_workflowhub(versions, "latest")
+        releases = [v for v in versions if _is_real_release(v)]
+        candidates = releases if releases else versions
+        return candidates[-n:] if len(candidates) >= n else candidates
     except ValueError:
         names = {v.strip().lower() for v in spec.split(",")}
         matched = [v for v in versions
@@ -338,28 +739,47 @@ def select_versions_workflowhub(versions: List[Dict], spec: str) -> List[Dict]:
                    or str(v.get("id", "")).lower() in names]
         if not matched:
             print(f"  Warning: no versions matched '{spec}', using latest")
-            return versions[-1:] if versions else []
+            return select_versions_workflowhub(versions, "latest")
         return matched
+
+
+_DOCKSTORE_BRANCH_NAMES = {"main", "master", "develop", "dev"}
+
+
+def _dockstore_release_versions(versions: List[str]) -> List[str]:
+    """Filter out branch names (main, master etc.) leaving only tagged releases."""
+    return [v for v in versions if v.lower() not in _DOCKSTORE_BRANCH_NAMES]
 
 
 def select_versions_dockstore(versions: List[str], spec: str) -> List[str]:
     """
     Select Dockstore versions based on spec.
     Dockstore lists newest first, so 'latest' = versions[0].
+    Branch names (main, master) are excluded from 'latest' and N-most-recent
+    selections since they point to the unreleased dev tip, not a stable release.
+    Explicit version name requests (e.g. --versions main) are honoured as-is.
     """
     if spec == "latest":
-        return versions[:1] if versions else []
+        releases = _dockstore_release_versions(versions)
+        candidates = releases if releases else versions
+        return candidates[:1] if candidates else []
     if spec == "all":
         return versions
     try:
         n = int(spec)
-        return versions[:n]
+        if n <= 0:
+            print(f"  Warning: --versions must be a positive integer, got {n}; using latest")
+            return select_versions_dockstore(versions, "latest")
+        releases = _dockstore_release_versions(versions)
+        candidates = releases if releases else versions
+        return candidates[:n]
     except ValueError:
+        # Specific version name(s) — honour as-is, including branch names
         names = {v.strip() for v in spec.split(",")}
         matched = [v for v in versions if v in names]
         if not matched:
             print(f"  Warning: no versions matched '{spec}', using latest")
-            return versions[:1] if versions else []
+            return select_versions_dockstore(versions, "latest")
         return matched
 
 
@@ -368,10 +788,68 @@ def select_versions_dockstore(versions: List[str], spec: str) -> List[str]:
 # ---------------------------------------------------------------------------
 
 def check_workflow_version(source: str, workflow_info: Dict, version_label: str,
-                            ga_path: Path, tool_cache: set) -> Dict:
-    """Run tool check on a single downloaded .ga file and return a result dict."""
-    tool_ids = extract_tools_from_ga(ga_path)
-    present, missing = check_tools(tool_ids, tool_cache)
+                            ga_path: Path, tool_cache: Dict[str, set]) -> Dict:
+    """
+    Run all static checks on a single downloaded .ga file and return a result dict.
+
+    Order of checks:
+      1. Structural consistency  -- aborts remaining checks on FAIL
+      2. Wiring gaps             -- runs if structural check passes
+      3. Tool availability       -- includes subworkflow tools automatically
+    """
+    # --- 1. Structural consistency ---
+    structural_issues, workflow_dict = check_structural_consistency(ga_path)
+    structural_fails = [i for i in structural_issues if i["severity"] == "FAIL"]
+
+    if structural_fails or workflow_dict is None:
+        return {
+            "source": source,
+            "workflow_name": workflow_info.get("name", ""),
+            "workflow_id": workflow_info.get("id", workflow_info.get("entry", "")),
+            "workflow_url": workflow_info.get("url", ""),
+            "version": version_label,
+            "timestamp": datetime.now().isoformat(),
+            "total_tools": 0,
+            "n_exact": 0,
+            "n_version_mismatch": 0,
+            "n_missing": 0,
+            "n_wiring_issues": 0,
+            "n_structural_issues": len(structural_issues),
+            "workflow_status": "structural_error",
+            "ready_to_run": False,
+            "structural_issues": structural_issues,
+            "wiring_issues": [],
+            "tool_statuses": [],
+            "ga_path": str(ga_path),
+        }
+
+    # --- 2. Wiring gaps ---
+    wiring_issues = check_wiring_gaps(workflow_dict)
+
+    # --- 3. Tool availability (parent + subworkflows) ---
+    tool_entries = _extract_tools_from_dict(workflow_dict)
+    classified   = check_tools(tool_entries, tool_cache)
+
+    exact    = [t for t in classified if t["status"] == "exact_match"]
+    mismatch = [t for t in classified if t["status"] == "version_mismatch"]
+    missing  = [t for t in classified if t["status"] == "missing"]
+
+    # Overall status precedence:
+    # tool errors > wiring warnings > no_toolshed_tools > ready
+    # Wiring is checked before no_toolshed_tools so a workflow built entirely
+    # from built-in Galaxy tools with broken wiring is not silently reported
+    # as "no_toolshed_tools" with the wiring problems hidden.
+    if missing:
+        workflow_status = "missing_tool"
+    elif mismatch:
+        workflow_status = "version_mismatch"
+    elif wiring_issues:
+        workflow_status = "wiring_issues"
+    elif not classified:
+        workflow_status = "no_toolshed_tools"
+    else:
+        workflow_status = "ready"
+
     return {
         "source": source,
         "workflow_name": workflow_info.get("name", ""),
@@ -379,15 +857,23 @@ def check_workflow_version(source: str, workflow_info: Dict, version_label: str,
         "workflow_url": workflow_info.get("url", ""),
         "version": version_label,
         "timestamp": datetime.now().isoformat(),
-        "total_tools": len(tool_ids),
-        "present_tools": present,
-        "missing_tools": missing,
+        "total_tools": len(tool_entries),
+        "n_exact": len(exact),
+        "n_version_mismatch": len(mismatch),
+        "n_missing": len(missing),
+        "n_wiring_issues": len(wiring_issues),
+        "n_structural_issues": len(structural_issues),
+        "workflow_status": workflow_status,
+        "ready_to_run": workflow_status == "ready",
+        "structural_issues": structural_issues,
+        "wiring_issues": wiring_issues,
+        "tool_statuses": classified,
         "ga_path": str(ga_path),
     }
 
 
 def process_workflowhub_workflow(workflow: Dict, version_spec: str,
-                                  workspace: Path, tool_cache: set) -> List[Dict]:
+                                  workspace: Path, tool_cache: Dict[str, set]) -> List[Dict]:
     wf_id = workflow["id"]
     wf_name = workflow.get("name", f"workflow_{wf_id}")
     wf_url = workflow.get("url", f"{WORKFLOWHUB_BASE}/workflows/{wf_id}")
@@ -411,14 +897,17 @@ def process_workflowhub_workflow(workflow: Dict, version_spec: str,
             continue
         info = {"name": wf_name, "id": wf_id, "url": wf_url}
         result = check_workflow_version("workflowhub", info, ver_label, ga_path, tool_cache)
-        n_missing = len(result["missing_tools"])
-        print(f"{result['total_tools']} tools, {n_missing} missing")
+        print(f"{result['total_tools']} tools | "
+              f"exact={result['n_exact']} "
+              f"mismatch={result['n_version_mismatch']} "
+              f"missing={result['n_missing']} "
+              f"[{result['workflow_status']}]")
         results.append(result)
     return results
 
 
 def process_dockstore_workflow(entry: str, version_spec: str,
-                                workspace: Path, tool_cache: set) -> List[Dict]:
+                                workspace: Path, tool_cache: Dict[str, set]) -> List[Dict]:
     wf_name = entry.split("/")[-1]
     wf_url = f"{DOCKSTORE_BASE}/workflows/{entry}"
     print(f"\n  Dockstore: {entry}")
@@ -439,8 +928,11 @@ def process_dockstore_workflow(entry: str, version_spec: str,
             continue
         info = {"name": wf_name, "id": entry, "url": wf_url}
         result = check_workflow_version("dockstore", info, version, ga_path, tool_cache)
-        n_missing = len(result["missing_tools"])
-        print(f"{result['total_tools']} tools, {n_missing} missing")
+        print(f"{result['total_tools']} tools | "
+              f"exact={result['n_exact']} "
+              f"mismatch={result['n_version_mismatch']} "
+              f"missing={result['n_missing']} "
+              f"[{result['workflow_status']}]")
         results.append(result)
     return results
 
@@ -450,17 +942,45 @@ def process_dockstore_workflow(entry: str, version_spec: str,
 # ---------------------------------------------------------------------------
 
 def generate_report(results: List[Dict], galaxy_url: str, profile: str) -> Dict:
-    all_missing = sorted({t for r in results for t in r["missing_tools"]})
+    missing_tools = sorted({
+        t["id"] for r in results for t in r["tool_statuses"]
+        if t["status"] == "missing"
+    })
+    mismatch_tools = sorted({
+        t["id"] for r in results for t in r["tool_statuses"]
+        if t["status"] == "version_mismatch"
+    })
     return {
         "generated": datetime.now().isoformat(),
         "galaxy_url": galaxy_url,
         "profile": profile,
+        "strict_version_matching": True,
         "total_versions_checked": len(results),
         "unique_workflows": len({r["workflow_id"] for r in results}),
-        "versions_all_tools_present": sum(1 for r in results if not r["missing_tools"]),
-        "versions_with_missing_tools": sum(1 for r in results if r["missing_tools"]),
-        "unique_missing_tools": all_missing,
-        "unique_missing_tools_count": len(all_missing),
+        "versions_ready": sum(1 for r in results if r["workflow_status"] == "ready"),
+        "versions_version_mismatch": sum(
+            1 for r in results if r["workflow_status"] == "version_mismatch"
+        ),
+        "versions_missing_tool": sum(
+            1 for r in results if r["workflow_status"] == "missing_tool"
+        ),
+        "versions_structural_error": sum(
+            1 for r in results if r["workflow_status"] == "structural_error"
+        ),
+        "versions_wiring_issues_only": sum(
+            1 for r in results if r["workflow_status"] == "wiring_issues"
+        ),
+        "versions_no_toolshed_tools": sum(
+            1 for r in results if r["workflow_status"] == "no_toolshed_tools"
+        ),
+        # Cross-cutting: any result that has wiring warnings regardless of overall status
+        "versions_with_wiring_warnings": sum(
+            1 for r in results if r.get("wiring_issues")
+        ),
+        "unique_missing_tools": missing_tools,
+        "unique_missing_tools_count": len(missing_tools),
+        "unique_mismatched_tools": mismatch_tools,
+        "unique_mismatched_tools_count": len(mismatch_tools),
         "results": results,
     }
 
@@ -468,69 +988,132 @@ def generate_report(results: List[Dict], galaxy_url: str, profile: str) -> Dict:
 def write_text_report(report: Dict, path: str):
     """Write a plain-text aligned table report."""
     lines = []
-    lines.append("Galaxy Workflow Tool Checker")
+    lines.append("Galaxy Workflow Tool Checker (strict version matching)")
     lines.append(f"Generated : {report['generated']}")
     lines.append(f"Galaxy    : {report['galaxy_url']}")
     lines.append(f"Profile   : {report['profile']}")
     lines.append("")
     lines.append("Summary")
     lines.append("-" * 40)
-    lines.append(f"Versions checked            : {report['total_versions_checked']}")
-    lines.append(f"Unique workflows            : {report['unique_workflows']}")
-    lines.append(f"All tools present           : {report['versions_all_tools_present']}")
-    lines.append(f"Versions with missing tools : {report['versions_with_missing_tools']}")
-    lines.append(f"Unique missing tools        : {report['unique_missing_tools_count']}")
+    lines.append(f"Versions checked              : {report['total_versions_checked']}")
+    lines.append(f"Unique workflows              : {report['unique_workflows']}")
+    lines.append(f"Ready to run (all exact)      : {report['versions_ready']}")
+    lines.append(f"Structural errors             : {report['versions_structural_error']}")
+    lines.append(f"Wiring warnings only          : {report['versions_wiring_issues_only']}")
+    lines.append(f"No ToolShed tools found       : {report['versions_no_toolshed_tools']}")
+    lines.append(f"Blocked by version mismatch   : {report['versions_version_mismatch']}")
+    lines.append(f"Blocked by missing tool       : {report['versions_missing_tool']}")
+    lines.append(f"(Any wiring warnings)         : {report['versions_with_wiring_warnings']}")
+    lines.append(f"Unique mismatched tools       : {report['unique_mismatched_tools_count']}")
+    lines.append(f"Unique missing tools          : {report['unique_missing_tools_count']}")
     lines.append("")
 
     results = report["results"]
     if not results:
         lines.append("No results.")
     else:
-        col_name = max((len(r["workflow_name"]) for r in results), default=20)
+        col_name = max((len(str(r["workflow_name"] or "")) for r in results), default=20)
         col_name = max(col_name, len("Workflow"))
-        col_src  = max((len(r["source"]) for r in results), default=10)
+        col_src  = max((len(str(r["source"] or "")) for r in results), default=10)
         col_src  = max(col_src, len("Source"))
-        col_ver  = max((len(str(r["version"])) for r in results), default=9)
+        col_ver  = max((len(str(r["version"] or "")) for r in results), default=9)
         col_ver  = max(col_ver, len("Version"))
-        col_t    = len("Tools")
-        col_m    = len("Missing")
+        col_status = max((len(r["workflow_status"]) for r in results), default=10)
+        col_status = max(col_status, len("Status"))
 
         lines.append("Results")
         header = (f"{'Workflow':<{col_name}}  {'Source':<{col_src}}  "
-                  f"{'Version':<{col_ver}}  {'Tools':>{col_t}}  {'Missing':>{col_m}}  URL")
-        lines.append("-" * (len(header) + 10))
+                  f"{'Version':<{col_ver}}  "
+                  f"{'Status':<{col_status}}  "
+                  f"{'Tools':>5}  {'Exact':>5}  {'Mismatch':>8}  {'Missing':>7}  "
+                  f"{'Wire':>4}  URL")
+        lines.append("-" * (len(header) + 5))
         lines.append(header)
-        lines.append("-" * (len(header) + 10))
+        lines.append("-" * (len(header) + 5))
         for r in results:
-            m = len(r["missing_tools"])
             lines.append(
-                f"{r['workflow_name']:<{col_name}}  "
-                f"{r['source']:<{col_src}}  "
-                f"{str(r['version']):<{col_ver}}  "
-                f"{r['total_tools']:>{col_t}}  "
-                f"{m:>{col_m}}  "
+                f"{str(r['workflow_name'] or ''):<{col_name}}  "
+                f"{str(r['source'] or ''):<{col_src}}  "
+                f"{str(r['version'] or ''):<{col_ver}}  "
+                f"{r['workflow_status']:<{col_status}}  "
+                f"{r['total_tools']:>5}  "
+                f"{r['n_exact']:>5}  "
+                f"{r['n_version_mismatch']:>8}  "
+                f"{r['n_missing']:>7}  "
+                f"{r['n_wiring_issues']:>4}  "
                 f"{r['workflow_url']}"
             )
         lines.append("")
 
-        any_missing = any(r["missing_tools"] for r in results)
-        if any_missing:
-            lines.append("Missing tools detail")
+        # Per-workflow detail for non-ready versions
+        non_ready = [r for r in results if r["workflow_status"] != "ready"]
+        if non_ready:
+            lines.append("Blocker / issue detail")
             lines.append("-" * 40)
-            for r in results:
-                if not r["missing_tools"]:
-                    continue
-                lines.append(f"{r['workflow_name']} ({r['source']}, {r['version']})")
-                for t in r["missing_tools"]:
-                    lines.append(f"  {t}")
+            for r in non_ready:
+                lines.append(f"{r['workflow_name']} ({r['source']}, {r['version']}) "
+                             f"[{r['workflow_status']}]")
+
+                # Structural issues
+                for issue in r.get("structural_issues", []):
+                    lines.append(f"  STRUCTURAL  [{issue['severity']}] {issue['message']}")
+
+                # No ToolShed tools found
+                if r["workflow_status"] == "no_toolshed_tools":
+                    lines.append("  INFO  No ToolShed tools found — workflow may use only "
+                                 "built-in Galaxy tools, or tool_id fields may be missing.")
+
+                # Tool issues
+                galaxy_name = galaxy_instance_name(report.get("galaxy_url", ""))
+                for t in r["tool_statuses"]:
+                    src_tag = f" [{t['source']}]" if t.get("source", "parent") != "parent" else ""
+                    if t["status"] == "version_mismatch":
+                        avail = ", ".join(t.get("available_versions", []))
+                        direction = t.get("version_direction", "")
+                        if direction == "installed older":
+                            dir_note = f"only older versions available on {galaxy_name}"
+                        elif direction == "installed newer":
+                            dir_note = f"only newer versions available on {galaxy_name}"
+                        elif direction == "mixed":
+                            dir_note = f"older and newer versions available on {galaxy_name}, but not this exact version"
+                        else:
+                            dir_note = f"exact version not available on {galaxy_name}"
+                        lines.append(f"  MISMATCH{src_tag}  {t['base']}")
+                        lines.append(f"    {galaxy_name} doesn't have the tool version specified in the workflow")
+                        lines.append(f"    Workflow wants : {t['version']}")
+                        lines.append(f"    {galaxy_name} has  : {avail} ({dir_note})")
+                        lines.append("")
+                    elif t["status"] == "missing":
+                        lines.append(f"  MISSING{src_tag}   {t['id']}")
+                        lines.append("")
+
+                # Wiring issues
+                for w in r.get("wiring_issues", []):
+                    src_tag = f" [{w['source']}]" if w.get("source", "parent") != "parent" else ""
+                    lines.append(f"  WIRING{src_tag}    [{w['severity']}] {w['message']}")
+
                 lines.append("")
 
+        if report["unique_mismatched_tools"]:
+            lines.append("All unique mismatched tool IDs (version not installed)")
+            lines.append("-" * 40)
+            for i, t in enumerate(report["unique_mismatched_tools"], 1):
+                lines.append(f"  {i:>3}. {t}")
+            lines.append("")
+
         if report["unique_missing_tools"]:
-            lines.append("All unique missing tools")
+            lines.append("All unique missing tool IDs (base not installed)")
             lines.append("-" * 40)
             for i, t in enumerate(report["unique_missing_tools"], 1):
                 lines.append(f"  {i:>3}. {t}")
             lines.append("")
+
+        lines.append(
+            "Note: wiring issues are reported as WARN — without querying the\n"
+            "Galaxy tool XML the checker cannot confirm whether unconnected\n"
+            "inputs are required or optional."
+        )
+        lines.append("")
 
     with open(path, "w") as f:
         f.write("\n".join(lines) + "\n")
@@ -540,12 +1123,18 @@ def write_text_report(report: Dict, path: str):
 def display_summary(report: Dict):
     """Print a brief summary to stdout."""
     print("\n" + "=" * 60)
-    print("RESULTS SUMMARY")
-    print(f"  Versions checked            : {report['total_versions_checked']}")
-    print(f"  Unique workflows            : {report['unique_workflows']}")
-    print(f"  All tools present           : {report['versions_all_tools_present']}")
-    print(f"  Versions with missing tools : {report['versions_with_missing_tools']}")
-    print(f"  Unique missing tools        : {report['unique_missing_tools_count']}")
+    print("RESULTS SUMMARY (strict version matching)")
+    print(f"  Versions checked              : {report['total_versions_checked']}")
+    print(f"  Unique workflows              : {report['unique_workflows']}")
+    print(f"  Ready to run (all exact)      : {report['versions_ready']}")
+    print(f"  Structural errors             : {report['versions_structural_error']}")
+    print(f"  Wiring warnings only          : {report['versions_wiring_issues_only']}")
+    print(f"  No ToolShed tools found       : {report['versions_no_toolshed_tools']}")
+    print(f"  Blocked by version mismatch   : {report['versions_version_mismatch']}")
+    print(f"  Blocked by missing tool       : {report['versions_missing_tool']}")
+    print(f"  (Any wiring warnings)         : {report['versions_with_wiring_warnings']}")
+    print(f"  Unique mismatched tools       : {report['unique_mismatched_tools_count']}")
+    print(f"  Unique missing tools          : {report['unique_missing_tools_count']}")
     print("=" * 60)
 
 
@@ -590,16 +1179,34 @@ def parse_args():
     # Flags
     parser.add_argument("--list-only", action="store_true",
                         help="List matching workflows without checking tools")
+    parser.add_argument("--local-file", metavar="PATH",
+                        help="Check a local .ga file directly instead of fetching from a registry. "
+                             "All static checks and (if credentials are available) tool availability "
+                             "checks are run. Use --version-label to set the version shown in the report.")
+    parser.add_argument("--version-label", default="local",
+                        help="Version label to use in the report when checking a local file "
+                             "(default: local). Only used with --local-file.")
+    parser.add_argument("--static-only", action="store_true",
+                        help="Run only the static checks (structural consistency and wiring gaps). "
+                             "Skip the Galaxy tool availability check. No Galaxy credentials needed. "
+                             "Only used with --local-file.")
 
     args = parser.parse_args()
 
     # Validate combinations
+    if args.static_only and not args.local_file:
+        parser.error("--static-only requires --local-file")
+    if args.local_file:
+        if not Path(args.local_file).exists():
+            parser.error(f"--local-file: file not found: {args.local_file}")
+        return args  # skip registry-mode validation
+
     if args.source == "workflowhub" and args.entry:
         parser.error("--entry is for Dockstore workflows; use --id for WorkflowHub")
     if args.source == "dockstore" and args.id:
         parser.error("--id is for WorkflowHub workflows; use --entry for Dockstore")
     if not any([args.search, args.id, args.entry]):
-        parser.error("Provide at least one of: --search, --id, --entry")
+        parser.error("Provide at least one of: --search, --id, --entry (or use --local-file)")
 
     return args
 
@@ -637,6 +1244,63 @@ def main():
             print(f"\nDockstore {args.entry}: {len(versions)} version(s)")
             for v in versions:
                 print(f"  {v}")
+        return
+
+    # --- Local file mode ---
+    if args.local_file:
+        ga_path = Path(args.local_file)
+        # Derive a display name from the filename
+        wf_name = ga_path.stem
+
+        if args.static_only:
+            # Static checks only — no Galaxy connection needed
+            print(f"\nStatic-only check: {ga_path}")
+            structural_issues, wf_dict = check_structural_consistency(ga_path)
+            structural_fails = [i for i in structural_issues if i["severity"] == "FAIL"]
+            print("\nStructural consistency:")
+            if not structural_issues:
+                print("  PASS")
+            for issue in structural_issues:
+                print(f"  [{issue['severity']}] {issue['check']}: {issue['message']}")
+            if wf_dict and not structural_fails:
+                wiring = check_wiring_gaps(wf_dict)
+                print("\nWiring gaps:")
+                if not wiring:
+                    print("  PASS")
+                for w in wiring:
+                    print(f"  [{w['severity']}] {w['message']}")
+                tools = _extract_tools_from_dict(wf_dict)
+                print(f"\nToolShed tools found: {len(tools)}")
+                for t in tools:
+                    src = f" [{t['source']}]" if t['source'] != 'parent' else ''
+                    print(f"  {t['id']}{src}")
+            else:
+                print("\n(Wiring and tool checks skipped — structural FAIL)")
+            return
+
+        # Full check (static + tool availability)
+        galaxy_url, galaxy_key = read_planemo_profile(args.profile)
+        print(f"Galaxy URL : {galaxy_url}")
+        print(f"Profile    : {args.profile}")
+        tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+
+        workflow_info = {"name": wf_name, "id": wf_name, "url": str(ga_path.resolve())}
+        result = check_workflow_version(
+            source="local",
+            workflow_info=workflow_info,
+            version_label=args.version_label,
+            ga_path=ga_path,
+            tool_cache=tool_cache,
+        )
+        all_results = [result]
+        report = generate_report(all_results, galaxy_url, args.profile)
+        display_summary(report)
+        json_path = args.output + ".json"
+        txt_path  = args.output + ".txt"
+        with open(json_path, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"JSON report  : {json_path}")
+        write_text_report(report, txt_path)
         return
 
     # --- Tool checking mode ---
