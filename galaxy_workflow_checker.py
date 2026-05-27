@@ -576,7 +576,9 @@ def download_workflowhub_ga(workflow_id: str, version_id: str,
         raw_name = (parsed.get("name") or f"workflow_{workflow_id}").strip()
         ga_filename = raw_name.replace("/", "_") + ".ga"
 
-    ga_path = dest_dir / ga_filename
+    # Use only the filename part — some TRS entries include a subdirectory in the path
+    ga_path = dest_dir / Path(ga_filename).name
+    ga_path.parent.mkdir(parents=True, exist_ok=True)
     with open(ga_path, "w") as f:
         f.write(content)
     return ga_path
@@ -1153,11 +1155,18 @@ def parse_args():
     # Workflow selection
     parser.add_argument("--search", "-s",
                         help="Search workflows by keyword/name")
-    parser.add_argument("--id",
-                        help="WorkflowHub workflow ID (use with --source workflowhub)")
-    parser.add_argument("--entry", "-e",
-                        help="Dockstore workflow entry, e.g. "
-                             "github.com/iwc-workflows/Assembly-decontamination-VGP9/main")
+    parser.add_argument("--id", nargs="+",
+                        metavar="ID[:VERSION]",
+                        help="One or more WorkflowHub workflow IDs (use with --source workflowhub). "
+                             "Optionally append :version to pin a specific version for that workflow, "
+                             "e.g. --id 403:v2.0.8 875:Version3 876. "
+                             "Workflows without a :version use --versions (default: latest).")
+    parser.add_argument("--entry", "-e", nargs="+",
+                        metavar="ENTRY[:VERSION]",
+                        help="One or more Dockstore workflow entry paths (use with --source dockstore). "
+                             "Optionally append :version to pin a specific version, "
+                             "e.g. --entry github.com/iwc-workflows/VGP3/main:v0.3.5. "
+                             "Entries without a :version use --versions (default: latest).")
     parser.add_argument("--max-workflows", "-mw", type=int, default=10,
                         help="Max workflows to return from a search (default: 10)")
     # Version selection
@@ -1211,6 +1220,15 @@ def parse_args():
     return args
 
 
+def _parse_version_spec(spec: str, default: str) -> Tuple[str, str]:
+    """Split an ID[:VERSION] or ENTRY[:VERSION] string into (id_or_entry, version_spec).
+    If no ':' is present, version_spec falls back to default."""
+    if ":" in spec:
+        left, version = spec.split(":", 1)
+        return left.strip(), version.strip()
+    return spec.strip(), default
+
+
 # ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
@@ -1229,21 +1247,25 @@ def main():
                 print(f"  ID {wf['id']:>6}: {wf.get('name','')}  "
                       f"({len(versions)} version(s))  {wf.get('url','')}")
         if args.source in ("workflowhub", "both") and args.id:
-            wf = get_workflowhub_workflow(args.id)
-            if wf:
-                versions = get_workflowhub_galaxy_versions(wf)
-                print(f"\nWorkflowHub ID {args.id}: {wf.get('name','')}")
-                for v in versions:
-                    print(f"  version id={v['id']}  name={v.get('name','')}")
+            for id_spec in args.id:
+                wf_id, _ = _parse_version_spec(id_spec, args.versions)
+                wf = get_workflowhub_workflow(wf_id)
+                if wf:
+                    versions = get_workflowhub_galaxy_versions(wf)
+                    print(f"\nWorkflowHub ID {wf_id}: {wf.get('name','')}")
+                    for v in versions:
+                        print(f"  version id={v['id']}  name={v.get('name','')}")
         if args.source in ("dockstore", "both") and args.search:
             print(f"\nDockstore results for '{args.search}':")
             for wf in search_dockstore(args.search, max_results=args.max_workflows):
                 print(f"  {wf['entry']}  {wf['url']}")
         if args.source in ("dockstore", "both") and args.entry:
-            versions = get_dockstore_versions(args.entry)
-            print(f"\nDockstore {args.entry}: {len(versions)} version(s)")
-            for v in versions:
-                print(f"  {v}")
+            for entry_spec in args.entry:
+                entry, _ = _parse_version_spec(entry_spec, args.versions)
+                versions = get_dockstore_versions(entry)
+                print(f"\nDockstore {entry}: {len(versions)} version(s)")
+                for v in versions:
+                    print(f"  {v}")
         return
 
     # --- Local file mode ---
@@ -1315,13 +1337,15 @@ def main():
     # WorkflowHub
     if args.source in ("workflowhub", "both"):
         if args.id:
-            wf = get_workflowhub_workflow(args.id)
-            if wf:
-                all_results.extend(
-                    process_workflowhub_workflow(wf, args.versions, workspace, tool_cache)
-                )
-            else:
-                print(f"WorkflowHub workflow ID {args.id} not found")
+            for id_spec in args.id:
+                wf_id, version_spec = _parse_version_spec(id_spec, args.versions)
+                wf = get_workflowhub_workflow(wf_id)
+                if wf:
+                    all_results.extend(
+                        process_workflowhub_workflow(wf, version_spec, workspace, tool_cache)
+                    )
+                else:
+                    print(f"WorkflowHub workflow ID {wf_id} not found")
         elif args.search:
             workflows = search_workflowhub(name=args.search, max_results=args.max_workflows)
             print(f"\nFound {len(workflows)} WorkflowHub workflows for '{args.search}'")
@@ -1333,9 +1357,11 @@ def main():
     # Dockstore
     if args.source in ("dockstore", "both"):
         if args.entry:
-            all_results.extend(
-                process_dockstore_workflow(args.entry, args.versions, workspace, tool_cache)
-            )
+            for entry_spec in args.entry:
+                entry, version_spec = _parse_version_spec(entry_spec, args.versions)
+                all_results.extend(
+                    process_dockstore_workflow(entry, version_spec, workspace, tool_cache)
+                )
         elif args.search:
             workflows = search_dockstore(args.search, max_results=args.max_workflows)
             print(f"\nFound {len(workflows)} Dockstore workflows for '{args.search}'")
