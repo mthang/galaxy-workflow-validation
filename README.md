@@ -1,311 +1,243 @@
-# Galaxy Workflow Validation
+### galaxy_workflow_checker.py
 
-## Register a Dockstore account
+`galaxy_workflow_checker.py` checks whether all tools required by a Galaxy workflow are installed at the exact version needed, without running the workflow. Works with workflows from WorkflowHub, Dockstore, or a local `.ga` file. Reads Galaxy credentials from a Planemo profile.
+
+### Setup
+
+**Obtain a Galaxy API key**
+```
+1. Go to https://usegalaxy.org.au/ and log in
+2. Click your username (top right) → Preferences → Manage Galaxy API Key
+```
+
+**Set up credentials (one-time)**
+
+The checker reads your Galaxy URL and API key from a Planemo profile file at `~/.planemo/profiles/galaxy_profile/planemo_profile_options.json`. You need Planemo installed once to create this file — after that, Planemo does not need to be running to use the checker.
+
+Install Planemo if you don't already have it: https://planemo.readthedocs.io/en/stable/installation.html
+
+Then create the profile:
+```
+planemo profile_create galaxy_profile \
+  --galaxy_url https://usegalaxy.org.au \
+  --galaxy_user_key your_galaxy_api_key \
+  --engine external_galaxy
+```
+
+### Quick start
+
+The most common use is to check a single workflow by its WorkflowHub ID or Dockstore entry. The WorkflowHub ID is the number in the workflow's URL (e.g. `workflowhub.eu/workflows/403` → ID is `403`). The Dockstore entry path is shown in the Dockstore URL for the workflow (e.g. `dockstore.org/workflows/github.com/iwc-workflows/Assembly-decontamination-VGP9/main` → entry is `github.com/iwc-workflows/Assembly-decontamination-VGP9/main`).
+```
+# WorkflowHub workflow
+python galaxy_workflow_checker.py --source workflowhub --id 403
+
+# Dockstore workflow
+python galaxy_workflow_checker.py --source dockstore \
+    --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main"
+```
+
+This checks the latest version and saves two output files: `workflow_check_report.txt` (plain-text table, human-readable) and `workflow_check_report.json` (structured data). It also prints a summary to the terminal. See the Output section for what these files contain.
+
+### Usage
+
+**Check multiple workflows at once** (with optional per-workflow version pinning)
+```
+python galaxy_workflow_checker.py --source workflowhub --id 403:v2.0.8 875:Version3 876
+python galaxy_workflow_checker.py --source dockstore \
+    --entry "github.com/iwc-workflows/Assembly-Hifi-only-VGP3/main:v0.3.5" \
+            "github.com/iwc-workflows/Scaffolding-HiC-VGP8/main:v1.8"
+```
+
+**Search for workflows by keyword** and list matches without checking tools
+```
+python galaxy_workflow_checker.py --source workflowhub --search "assembly" --list-only
+python galaxy_workflow_checker.py --source both --search "decontamination" --list-only
+```
+Note: `--source dockstore --search` requires the Dockstore CLI — see Dockstore CLI setup below.
+
+**Control which versions are checked**
+```
+# Latest version only (default — same as omitting --versions)
+python galaxy_workflow_checker.py --source workflowhub --id 403
+
+# 3 most recent versions
+python galaxy_workflow_checker.py --source workflowhub --id 403 --versions 3
+
+# All versions
+python galaxy_workflow_checker.py --source workflowhub --id 403 --versions all
+
+# A specific version
+python galaxy_workflow_checker.py --source workflowhub --id 403 --versions v2.0.8
+
+# Two specific versions
+python galaxy_workflow_checker.py --source dockstore \
+    --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" \
+    --versions v1.3,v1.2
+```
+
+**Search both registries at once and save to a named output file**
+```
+python galaxy_workflow_checker.py --source both --search "VGP" --output vgp_report
+```
+Saves results to `vgp_report.txt` and `vgp_report.json`.
+
+**Check a local `.ga` file** (useful for workflows under development, not yet published, or downloaded for inspection)
+```
+# Full check (static + tool availability) — requires Galaxy credentials
+python galaxy_workflow_checker.py --local-file myworkflow.ga --profile galaxy_profile
+
+# Static checks only — no Galaxy credentials required, useful for quick file validation
+python galaxy_workflow_checker.py --local-file myworkflow.ga --static-only
+
+# Set a version label shown in the report (default is "local")
+python galaxy_workflow_checker.py --local-file myworkflow.ga --static-only --version-label v1.0.0
+```
+
+### All flags
+
+| Flag | Values / default | What it does |
+|------|-----------------|--------------|
+| `--source` | `workflowhub` / `dockstore` / `both` | Which registry to fetch workflows from |
+| `--id` | one or more IDs; optional `:version` suffix | WorkflowHub workflow ID(s) to check (e.g. `403` or `403:v2.0.8`) |
+| `--entry` | one or more paths; optional `:version` suffix | Dockstore entry path(s) to check (e.g. `github.com/iwc-workflows/VGP3/main:v0.3.5`) |
+| `--search` | keyword string | Search registry for matching workflows (use with `--list-only` to browse, or without to check all matches) |
+| `--versions` | `latest` (default) / `all` / `N` / `v1.2,v1.3` | Which versions to check: latest only, all, N most recent, or specific version(s) |
+| `--list-only` | flag | List matching workflows without running any checks |
+| `--local-file` | file path | Check a local `.ga` file instead of fetching from a registry |
+| `--static-only` | flag | Run structural and wiring checks only — skips tool availability check, no Galaxy credentials needed. Only valid with `--local-file`. |
+| `--version-label` | string (default: `local`) | Version label shown in the report for a local file run |
+| `--output` | base filename (default: `workflow_check_report`) | Base name for output files — creates `<name>.txt` and `<name>.json` |
+| `--profile` | profile name (default: `galaxy_profile`) | Planemo profile to read Galaxy URL and API key from (see Setup) |
+
+```
+python galaxy_workflow_checker.py --help
+```
+
+### Output
+
+Every run (except `--list-only` and `--static-only`) saves two files:
+- `<output>.txt` — plain-text summary and results table, readable in any text editor
+- `<output>.json` — same data in structured JSON format, useful for scripting or downstream processing
+
+Both files contain the same information. Output also prints to the terminal.
+
+**Example: all workflows ready**
+```
+Galaxy Workflow Tool Checker (strict version matching)
+Generated : 2026-05-13T20:49:35
+Galaxy    : https://usegalaxy.org.au
+
+Summary
+----------------------------------------
+Versions checked              : 11
+Ready to run (all exact)      : 11
+Blocked by version mismatch   : 0
+Blocked by missing tool       : 0
+
+Results
+---------------------------------------------------------------------------
+Workflow                         Source       Version  Status  Tools  Exact  Mismatch  Missing  Wire
+---------------------------------------------------------------------------
+Genome-assessment-post-assembly  workflowhub  v2.0.8   ready      13     13         0        0     0
+```
+
+**Example: version mismatch**
+
+When tools are installed but at the wrong version, the detail section names the tool and shows what version the workflow needs vs. what Galaxy has:
+```
+ONT -- Assembly-Flye-AhrensLab  workflowhub  Version 1  version_mismatch  6  2  4  0  0
+
+Blocker / issue detail
+----------------------------------------
+ONT -- Assembly-Flye-AhrensLab (workflowhub, Version 1) [version_mismatch]
+  MISMATCH  toolshed.g2.bx.psu.edu/repos/bgruening/flye/flye
+    Galaxy Australia doesn't have the tool version specified in the workflow
+    Workflow wants : 2.3.5
+    Galaxy Australia has  : 2.3.7, 2.6, 2.8.2+galaxy0 ... (only newer versions available on Galaxy Australia)
+```
+
+**Static checks** run automatically on every `.ga` file before the tool check and do not require a Galaxy connection:
+- **Structural consistency** — checks required fields are present (`uuid`, `name`, `steps`, `a_galaxy_workflow`), UUID is valid, and every connection between steps points to a step that actually exists. If this fails, further checks are skipped.
+- **Wiring gaps** — flags any input slot that is declared but has nothing connected to it. Reported as `WARN` (not a hard failure). Steps with no input connections at all are not flagged — they may use hardcoded parameters or fetch data externally.
+- **Subworkflow tools** — if the workflow embeds another workflow as a step, tools inside it are found and checked too, labelled by subworkflow step in the report.
+
+Example — structural error:
+```
+STRUCTURAL  [FAIL] connection_ref: Step 2 input 'input_file' references non-existent step 9999
+```
+
+Example — wiring warning:
+```
+WIRING  [WARN] Step 2 (fastq_to_fasta) input 'input_file': declared but not connected to any upstream step
+```
+
+**Status values** in the results table — most workflows will show `ready` or `version_mismatch`. `structural_error` and `missing_tool` are blockers that will prevent the workflow from running:
+
+| Status | Meaning |
+|--------|---------|
+| `ready` | All tools installed at the exact version the workflow specifies — safe to run |
+| `version_mismatch` | Tools installed but at least one is at the wrong version — may or may not run depending on compatibility |
+| `missing_tool` | At least one tool is not installed on Galaxy at all — workflow will fail |
+| `structural_error` | The workflow file has a structural problem — tool check skipped, investigate the file |
+| `wiring_issues` | Tools are fine but at least one declared input is not connected — informational warning only |
+| `no_toolshed_tools` | No ToolShed tools in the workflow — tool check skipped (workflow may use built-in tools only) |
+
+### Older scripts (deprecated)
+
+The following scripts are deprecated and no longer maintained. Use `galaxy_workflow_checker.py` for all new work.
+
+**workflow_inspector.py** — earlier Dockstore checker using Planemo directly
+```
+python workflow_inspector.py --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" --version "v1.3"
+```
+
+**workflowhub_inspector.py** — earlier WorkflowHub checker using BioBlend
+```
+python workflowhub_inspector.py --search "assembly" --max-workflows 10 --list-only
+python workflowhub_inspector.py --id 645 --list-only
+python workflowhub_inspector.py --id 645 --version 1
+python workflowhub_inspector.py --id 645 --versions-per-workflow all --output vgp_report.json
+```
+
+### Dockstore CLI setup (needed for --source dockstore --search only)
+
+Most features use the Dockstore TRS API directly and do not require the Dockstore CLI. The CLI is only needed if you use `--source dockstore --search`. All other Dockstore features (checking by `--entry`, downloading `.ga` files) work without it.
+
+Register a Dockstore account
 ```
 1. Go to https://dockstore.org/register
-2. Login with either github or google account
+2. Log in with a GitHub or Google account
 ```
 
-## Obtain Dockstore Token
+Obtain a Dockstore token
 ```
-1. Click on your username at the top right
-2. Click on *account* on the drop-down menu
-3. Get your Token under *Dockstore Account* 
+1. Click your username (top right) → Account → Dockstore Account → copy token
 ```
-## Environment Setup (Ubuntu)
+
+Install Dockstore CLI (Ubuntu)
 ```
 1. Go to https://dockstore.org/quick-start
-2. Install Java 17 (This example installs OpenJDK 17)
+2. Install Java 17
    sudo apt-get update -q && sudo apt install -y openjdk-17-jdk
 3. Install Docker Engine
    sudo usermod -aG docker $USER
    exec newgrp docker
 4. Install Dockstore CLI
    mkdir -p ~/dockstore/bin
-	curl -L -o ~/bin/dockstore https://github.com/dockstore/dockstore-cli/releases/download/1.18.0/dockstore
-	chmod +x ~/bin/dockstore
-	echo 'export PATH=~/bin:$PATH' >> ~/.bashrc
-	source ~/.bashrc
-5. Add dockstore token to .dockstore/config
-	mkdir -p ~/.dockstore
-	printf "token: token_is_availiable_in_your_account_on_dockstore\nserver-url: https://dockstore.org/api\n" > ~/.dockstore/config
+   curl -L -o ~/bin/dockstore https://github.com/dockstore/dockstore-cli/releases/download/1.18.0/dockstore
+   chmod +x ~/bin/dockstore
+   echo 'export PATH=~/bin:$PATH' >> ~/.bashrc
+   source ~/.bashrc
+5. Add Dockstore token to config
+   mkdir -p ~/.dockstore
+   printf "token: YOUR_TOKEN\nserver-url: https://dockstore.org/api\n" > ~/.dockstore/config
 ```
 
-## Planemo Setup
-Planemo is used to test workflow, tools and etc.
-```
-python -m venv planemo
-. planemo/bin/activate
-pip install planemo
-```
-Reference: https://planemo.readthedocs.io/en/stable/installation.html
-
-## Bioblend Setup
-Bioblend is used to query and retrieve tools information from Toolshed.
-```
-pip install bioblend
-```
-## Dockstore list,  search or download workflow
-List all iwc published workflows on dockstore 
-```
-dockstore workflow search --pattern iwc-workflows
-```
-
-Use Dockstore cli to search for particular workflow
-```
-dockstore workflow search --pattern Assembly-decontamination-VGP9
-```
-
-The output of the dockstore cli search with pattern parameter
-```
-MATCHING WORKFLOWS
----------------------------------------------
-NAME                                                          DESCRIPTION   GIT REPO                                                         PUBLISHED
-github.com/iwc-workflows/Assembly-decontamination-VGP9/main                 git@github.com:iwc-workflows/Assembly-decontamination-VGP9.git   Yes
-
-```
-
-Query workflow version
-```
-dockstore workflow info --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main
-```
-
-Get workflow version
-```
-bash get_wf_version_arg.sh github.com/iwc-workflows/Assembly-decontamination-VGP9/main
-
-Output
-main
-v1.3
-v1.2
-v1.1
-v1.0
-v0.8
-v0.7
-v0.6
-v0.5
-v0.4
-v0.3
-v0.2
-v0.1.6
-v0.1.4
-v0.1.3
-v0.1.2
-v0.1.1
-v0.1
-```
-
-## Dockstore download specific version of a workflow
-```
-dockstore workflow download --entry github.com/iwc-workflows/Assembly-decontamination-VGP9/main:v1.3
-```
-Note: The Assembly-decontamination-VGP9 (v1.3) workflow on [github](https://github.com/iwc-workflows/Assembly-decontamination-VGP9/blob/v1.3/Assembly-decontamination-VGP9.ga)
-
-## Obtain Galaxy API Key
-```
-1. Go to https://usegalaxy.org.au/
-2. Log into Galaxy
-3. Click on your username at the top right
-4. Click on *preference*
-5. Click on *Manage Galaxy API Key* 
-```
-## Setup Planemo for testing workflow
-```
-planemo profile_create galaxy_profile --galaxy_url https://usegalaxy.org.au --galaxy_user_key your_galaxy_api_key --engine external_galaxy
-```
-
-## Test the downloaded galaxy workflow file (ga)
-This step generates tool_test_output.json and it can use as a missing tool report
-```
-planemo test Scaffolding-HiC-VGP8.ga --profile galaxy_profile
-
-or
-
-planemo test Assembly-decontamination-VGP9.ga --profile galaxy_profile
-```
-
-## Check missing tools
-Transform the tool_test_output.json format 
-```
-cat tool_test_output.json | jq -r '
-  .tests[0].data.execution_problem |
-  capture("(?<tools>toolshed[^\"]*)").tools |
-  split(", ")[] '
-```
-
-## Run workflow inspector (Dockstore)
-This workflow inspector queries Dockstore and tests the workflow of interest using Planemo
-```
-python workflow_inspector.py --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" --version "v1.3"
-```
-
-## WorkflowHub workflow inspection
-Workflows can also be validated from [WorkflowHub](https://workflowhub.eu), which hosts Galaxy workflows independently of Dockstore. The `workflowhub_inspector.py` script queries the WorkflowHub TRS API, downloads `.ga` files, tests them with Planemo, and reports missing tools via BioBlend — no Dockstore CLI required.
-
-No additional installation is needed beyond the Planemo and BioBlend setup above.
-
-List matching workflows without testing
-```
-python workflowhub_inspector.py --search "assembly" --max-workflows 10 --list-only
-```
-
-List all versions of a specific workflow by its WorkflowHub ID
-```
-python workflowhub_inspector.py --id 645 --list-only
-```
-
-Test a specific workflow ID and version
-```
-python workflowhub_inspector.py --id 645 --version 1
-```
-
-Search and test multiple workflows (2 versions each by default)
-```
-python workflowhub_inspector.py --search "decontamination" --max-workflows 3
-```
-
-Test all versions of a workflow
-```
-python workflowhub_inspector.py --id 645 --versions-per-workflow all --output vgp_report.json
-```
-
-Results are saved as both a JSON report and a plain-text table (e.g. `vgp_report.json` and `vgp_report.txt`). The text report lists each workflow version, the number of missing tools, and installation commands for missing tools via ToolShed.
-
-Full list of options
-```
-python workflowhub_inspector.py --help
-```
-
-## Tool availability checker (galaxy_workflow_checker.py)
-Check whether all tools required by a workflow are installed in Galaxy Australia,
-without needing to run the workflow. Works with workflows from Dockstore, WorkflowHub, or both.
-Reads Galaxy credentials automatically from your Planemo profile.
-
-List matching workflows without checking tools
-```
-python galaxy_workflow_checker.py --source workflowhub --search "assembly" --list-only
-python galaxy_workflow_checker.py --source dockstore --search "VGP" --list-only
-python galaxy_workflow_checker.py --source both --search "decontamination" --list-only
-```
-
-Check tools in the latest version of a specific workflow
-```
-# By WorkflowHub ID
-python galaxy_workflow_checker.py --source workflowhub --id 645
-
-# By Dockstore entry
-python galaxy_workflow_checker.py --source dockstore \
-    --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main"
-```
-
-Control which versions are checked
-```
-# Latest version only (default)
-python galaxy_workflow_checker.py --source workflowhub --id 645 --versions latest
-
-# 3 most recent versions
-python galaxy_workflow_checker.py --source workflowhub --id 645 --versions 3
-
-# All versions
-python galaxy_workflow_checker.py --source workflowhub --id 645 --versions all
-
-# Specific version(s)
-python galaxy_workflow_checker.py --source dockstore \
-    --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" \
-    --versions v1.3
-python galaxy_workflow_checker.py --source dockstore \
-    --entry "github.com/iwc-workflows/Assembly-decontamination-VGP9/main" \
-    --versions v1.3,v1.2
-```
-
-Search both registries at once
-```
-python galaxy_workflow_checker.py --source both --search "VGP" --versions latest \
-    --output vgp_report
-```
-
-Check a local `.ga` file directly (no registry fetch needed)
-```
-# Static checks only — no Galaxy credentials required
-python galaxy_workflow_checker.py --local-file myworkflow.ga --static-only
-
-# Full check (static + tool availability) — requires Galaxy credentials
-python galaxy_workflow_checker.py --local-file myworkflow.ga --profile galaxy_profile
-
-# Set a version label in the report (default is "local")
-python galaxy_workflow_checker.py --local-file myworkflow.ga --static-only --version-label v1.0.0
-```
-
-All flags
-```
---source          workflowhub / dockstore / both
---id              WorkflowHub workflow ID
---entry           Dockstore entry path
---search          Keyword to search for matching workflows
---versions        latest (default) / all / N / specific version(s) comma-separated
---list-only       List matching workflows without checking tools
---local-file      Path to a local .ga file
---static-only     Structural and wiring checks only — no Galaxy connection needed
---version-label   Version label for a local file run (default: local)
---output          Base name for output files (creates .txt and .json)
---profile         Planemo profile name (default: galaxy_profile)
-```
-
-Full list of options
-```
-python galaxy_workflow_checker.py --help
-```
-
-Output is saved as both `<output>.txt` (plain-text table) and `<output>.json`. The table lists
-each workflow, version, number of tools, and how many are missing or mismatched in Galaxy Australia,
-with a detail section listing blockers.
-
-**Static checks** — run automatically on every `.ga` file before the tool check:
-
-- **Structural consistency** — checks the file is a valid Galaxy workflow: required fields present (`uuid`, `name`, `steps`, `a_galaxy_workflow`), UUID is a valid format (not null or malformed), every connection points to a step that actually exists, and `steps` is a dict. If this check fails, the tool check is skipped.
-- **Wiring gaps** — flags any input slot that is declared in `input_connections` but has nothing connected to it. Reported as `WARN` (not `FAIL`). Steps with no input connections at all are not flagged, as they may use hardcoded parameters or fetch data externally.
-- **Subworkflow tools** — if the workflow embeds subworkflows, their tools are found too and labelled by subworkflow step name in the report.
-
-**Version mismatch** — when a tool version does not match, the report names the Galaxy server explicitly and notes whether only older or only newer versions are available.
-
-Example output for a structural error:
-```
-STRUCTURAL  [FAIL] connection_ref: Step 2 input 'input_file' references non-existent step 9999
-```
-
-Example output for a wiring warning:
-```
-WIRING  [WARN] Step 2 (fastq_to_fasta) input 'input_file': declared but not connected to any upstream step
-```
-
-Example output for a version mismatch:
-```
-MISMATCH  toolshed.g2.bx.psu.edu/repos/devteam/fastq_groomer/fastq_groomer
-  Galaxy Australia doesn't have the tool version specified in the workflow
-  Workflow wants : 1.1.5+galaxy2
-  Galaxy Australia has  : 1.0.4+galaxy0, 1.1.1+galaxy1 (only older versions available on Galaxy Australia)
-```
-
-Status values in the results table:
-- `ready` — all tools installed at the exact version the workflow specifies
-- `version_mismatch` — all tools installed but at least one is at the wrong version
-- `missing_tool` — at least one tool is not installed on Galaxy at all
-- `wiring_issues` — tools are fine but at least one declared input is not connected
-- `no_toolshed_tools` — no ToolShed tools in the workflow; tool check skipped
-- `structural_error` — the workflow file has a structural problem; tool check skipped
-
-REFERENCE
-- IWC workflow
-	- [Github repo](https://github.com/galaxyproject/iwc)
-	- [README](https://github.com/galaxyproject/iwc/blob/main/workflows/README.md)
-- [Running Galaxy workflows](https://planemo.readthedocs.io/en/stable/running.html)
-- Workflow Example on Dockstore
-	- [Assembly-decontamination-VGP9](https://dockstore.org/workflows/github.com/iwc-workflows/Assembly-decontamination-VGP9/main:main?tab=info)
-	- [Scaffolding-HiC-VGP8](https://dockstore.org/workflows/github.com/iwc-workflows/Scaffolding-HiC-VGP8/main:main?tab=info)
-- Workflow Example on WorkflowHub
-	- [Assembly-decontamination-VGP9](https://workflowhub.eu/workflows/645)
+### References
+- IWC workflows: [GitHub repo](https://github.com/galaxyproject/iwc) · [README](https://github.com/galaxyproject/iwc/blob/main/workflows/README.md)
+- [Running Galaxy workflows with Planemo](https://planemo.readthedocs.io/en/stable/running.html)
 - [Dockstore documentation](https://docs.dockstore.org/en/latest/launch-with/galaxy-launch-with.html)
-- [Browsing Workflow in Dockstore and Galaxy](https://docs.dockstore.org/en/latest/launch-with/galaxy-launch-with.html)
 - [WorkflowHub](https://workflowhub.eu)
-- GTN material
-	- [workflow automation](https://training.galaxyproject.org/training-material/topics/galaxy-interface/tutorials/workflow-automation/tutorial.html)
+- GTN: [workflow automation tutorial](https://training.galaxyproject.org/training-material/topics/galaxy-interface/tutorials/workflow-automation/tutorial.html)
+- Example workflows on Dockstore: [Assembly-decontamination-VGP9](https://dockstore.org/workflows/github.com/iwc-workflows/Assembly-decontamination-VGP9/main:main?tab=info) · [Scaffolding-HiC-VGP8](https://dockstore.org/workflows/github.com/iwc-workflows/Scaffolding-HiC-VGP8/main:main?tab=info)
+- Example workflows on WorkflowHub: [Assembly-decontamination-VGP9](https://workflowhub.eu/workflows/645)
