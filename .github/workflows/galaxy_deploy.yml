@@ -9,13 +9,15 @@ on:
 jobs:
   run-checker-tests:
     runs-on: self-hosted
-    environment: dockstore  # Ensure this matches your GitHub environment name
+    # Ensure this matches your exact GitHub environment name (e.g., development)
+    environment: dockstore  
 
     steps:
+      # Step 1: Pull the codebase onto the self-hosted VM
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # 1. Setup python venv
+      # Step 2: Set up the Python Virtual Environment and dependencies
       - name: Setup Python Virtual Environment
         run: |
           if [ ! -d "venv" ]; then 
@@ -25,15 +27,18 @@ jobs:
           pip install --upgrade pip
           pip install planemo requests pyyaml
 
-      # 2. Inject credentials 
+      # Step 3: Securely write credentials directly from GitHub Cloud to the VM
       - name: Inject Temporary Credentials
         run: |
+          # Ensure target folders exist on the VM
           mkdir -p "$HOME/.dockstore"
           mkdir -p "$HOME/.planemo/profiles/galaxy_profile"
           
+          # Overwrite the local Dockstore config
           echo "token = ${{ secrets.DOCKSTORE_TOKEN }}" > "$HOME/.dockstore/config"
           echo "server-url = https://dockstore.org" >> "$HOME/.dockstore/config"
           
+          # Inject the accurate user key into the Planemo profile JSON layout
           cat << 'EOF' > "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json"
           {
             "galaxy_url": "https://usegalaxy.org.au", 
@@ -43,16 +48,17 @@ jobs:
           }
           EOF
           
+          # Restrict file permissions immediately so other OS accounts cannot peek
           chmod 600 "$HOME/.dockstore/config"
           chmod 600 "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json"
 
-      # 3. Execute testing script (generates your reports)
+      # Step 4: Execute testing script (generates your json and txt reports)
       - name: Run Planemo Validation and Tests
         run: |
           source venv/bin/activate
           python galaxy_workflow_checker.py --source workflowhub --id 403 --profile galaxy_profile
 
-      # 4. FIX: Upload the generated reports to GitHub Cloud before we shred the workspace
+      # Step 5: Upload the generated reports to GitHub Cloud before we shred them
       - name: Upload Validation Reports
         if: always()  # Uploads reports even if the validation script found workflow errors
         uses: actions/upload-artifact@v4
@@ -61,16 +67,20 @@ jobs:
           path: |
             workflow_check_report.json
             workflow_check_report.txt
-          retention-days: 7  # Automatically clean up files from GitHub after a week
+          retention-days: 7  # Automatically cleans up files from GitHub after a week
 
-      # 5. Clean up credentials from VM
+      # Step 6: Securely overwrite and delete keys from the hard drive (CRITICAL)
       - name: Securely Shred Credentials
-        if: always()
+        if: always() # Forces execution even if the previous steps error out or fail
         run: |
-          if [ -f "$HOME/.dockstore/config" ]; then shred -u "$HOME/.dockstore/config"; fi
+          # Overwrite the physical disk sectors with random data before deletion
+          if [ -f "$HOME/.dockstore/config" ]; then 
+            shred -u "$HOME/.dockstore/config"
+          fi
           if [ -f "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json" ]; then 
             shred -u "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json"
-          |
+          fi
+          
+          # Clean up the parent working directories completely
           rm -rf "$HOME/.dockstore"
           rm -rf "$HOME/.planemo/profiles/galaxy_profile/"
-
