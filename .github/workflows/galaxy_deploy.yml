@@ -9,7 +9,7 @@ on:
 jobs:
   run-checker-tests:
     runs-on: self-hosted
-    environment: development  # Ensure this matches your GitHub environment name
+    environment: dockstore  # Ensure this matches your GitHub environment name
 
     steps:
       - name: Checkout Code
