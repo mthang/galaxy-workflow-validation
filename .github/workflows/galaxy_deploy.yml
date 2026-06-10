@@ -1,4 +1,4 @@
-name: Test Galaxy Workflow Checker
+name: Lint, Test, and Execute Galaxy Workflows
 
 on:
   push:
@@ -7,40 +7,35 @@ on:
     branches: [ main ]
 
 jobs:
-  run-checker-tests:
-    runs-on: self-hosted  # Targets your dedicated developer VM
-
+  galaxy-pipeline:
+    runs-on: self-hosted
+    
     steps:
-      # Step 1: Clone the galaxy-workflow-validation codebase onto the VM
       - name: Checkout Code
         uses: actions/checkout@v4
 
-      # Step 2: Set up the Python virtual environment and dependencies
-      - name: Setup Environment and Install Planemo
+      - name: Setup Python Virtual Environment
         run: |
           if [ ! -d "venv" ]; then 
             python3 -m venv venv
           fi
           source venv/bin/activate
           pip install --upgrade pip
-          pip install planemo
-          
-          # Install any other requirements if a requirements file exists
-          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+          pip install planemo requests pyyaml  # Added extra dependencies just in case
 
-      # Step 3: Inject the temporary test credentials right into the required paths
+      # FIX: Use explicit $HOME variable to map paths accurately for the running shell user
       - name: Inject Temporary Credentials
         run: |
-          # Create the exact profile folder the python script reads from
-          mkdir -p ~/.dockstore
-          mkdir -p ~/.planemo/profiles/galaxy_profile/
+          # Create paths explicitly using the runner's home path variable
+          mkdir -p "$HOME/.dockstore"
+          mkdir -p "$HOME/.planemo/profiles/galaxy_profile"
           
-          # Overwrite Dockstore config cleanly for testing
-          echo "token = ${{ secrets.DOCKSTORE_TOKEN }}" > ~/.dockstore/config
-          echo "server-url = https://dockstore.org" >> ~/.dockstore/config
+          # Overwrite the local Dockstore config
+          echo "token = ${{ secrets.DOCKSTORE_TOKEN }}" > "$HOME/.dockstore/config
+          echo "server-url = https://dockstore.org" >> "$HOME/.dockstore/config
           
-          # Inject the accurate user key into the expected Planemo profile JSON layout
-          cat << 'EOF' > ~/.planemo/profiles/galaxy_profile/planemo_profile_options.json
+          # Inject the accurate user key into the Planemo profile JSON layout
+          cat << 'EOF' > "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json"
           {
             "galaxy_url": "https://usegalaxy.org.au", 
             "galaxy_user_key": "${{ secrets.GALAXY_AU_USER_KEY }}", 
@@ -49,32 +44,28 @@ jobs:
           }
           EOF
           
-          # Restrict file permissions immediately for runtime isolation security
-          chmod 600 ~/.dockstore/config
-          chmod 600 ~/.planemo/profiles/galaxy_profile/planemo_profile_options.json
+          # Debug step: verify the file was successfully written and formatted correctly
+          echo "=== Verifying profile location ==="
+          ls -la "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json"
+          
+          chmod 600 "$HOME/.dockstore/config"
+          chmod 600 "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json"
 
-      # Step 4: Execute the galaxy_workflow_checker script inside the venv context
-      - name: Execute Workflow Checker Testing
+      - name: Run Planemo Validation and Tests
         run: |
           source venv/bin/activate
           
-          # Test 1: Verify the checker can read the profile configuration by testing a WorkflowHub ID
-          python galaxy_workflow_checker.py --source workflowhub --id 403
-          
-          # Test 2: (Optional validation) Run structural static check on any local file if present
-          # python galaxy_workflow_checker.py --local-file path_to_test_file.ga --static-only
+          # Run the checker tool referencing the generated profile name
+          python galaxy_workflow_checker.py --source workflowhub --id 403 --profile galaxy_profile
 
-      # Step 5: Shred configuration data completely from the VM disk
       - name: Securely Shred Credentials
-        if: always() # Forces this block to clean up even if the validation script throws errors
+        if: always()
         run: |
-          if [ -f ~/.dockstore/config ]; then 
-            shred -u ~/.dockstore/config
+          if [ -f "$HOME/.dockstore/config" ]; then 
+            shred -u "$HOME/.dockstore/config"
           fi
-          if [ -f ~/.planemo/profiles/galaxy_profile/planemo_profile_options.json ]; then 
-            shred -u ~/.planemo/profiles/galaxy_profile/planemo_profile_options.json
+          if [ -f "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json" ]; then 
+            shred -u "$HOME/.planemo/profiles/galaxy_profile/planemo_profile_options.json"
           fi
-          
-          # Remove directories completely
-          rm -rf ~/.dockstore
-          rm -rf ~/.planemo/profiles/galaxy_profile/
+          rm -rf "$HOME/.dockstore"
+          rm -rf "$HOME/.planemo/profiles/galaxy_profile/"
