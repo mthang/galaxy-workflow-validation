@@ -9,6 +9,7 @@ on:
 jobs:
   galaxy-pipeline:
     runs-on: self-hosted
+    environment: dockstore
     
     steps:
       - name: Checkout Code
