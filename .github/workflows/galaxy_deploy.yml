@@ -1,0 +1,80 @@
+name: Test Galaxy Workflow Checker
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  run-checker-tests:
+    runs-on: self-hosted  # Targets your dedicated developer VM
+
+    steps:
+      # Step 1: Clone the galaxy-workflow-validation codebase onto the VM
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      # Step 2: Set up the Python virtual environment and dependencies
+      - name: Setup Environment and Install Planemo
+        run: |
+          if [ ! -d "venv" ]; then 
+            python3 -m venv venv
+          fi
+          source venv/bin/activate
+          pip install --upgrade pip
+          pip install planemo
+          
+          # Install any other requirements if a requirements file exists
+          if [ -f "requirements.txt" ]; then pip install -r requirements.txt; fi
+
+      # Step 3: Inject the temporary test credentials right into the required paths
+      - name: Inject Temporary Credentials
+        run: |
+          # Create the exact profile folder the python script reads from
+          mkdir -p ~/.dockstore
+          mkdir -p ~/.planemo/profiles/galaxy_profile/
+          
+          # Overwrite Dockstore config cleanly for testing
+          echo "token = ${{ secrets.DOCKSTORE_TOKEN }}" > ~/.dockstore/config
+          echo "server-url = https://dockstore.org" >> ~/.dockstore/config
+          
+          # Inject the accurate user key into the expected Planemo profile JSON layout
+          cat << 'EOF' > ~/.planemo/profiles/galaxy_profile/planemo_profile_options.json
+          {
+            "galaxy_url": "https://usegalaxy.org.au", 
+            "galaxy_user_key": "${{ secrets.GALAXY_AU_USER_KEY }}", 
+            "galaxy_admin_key": null, 
+            "engine": "external_galaxy"
+          }
+          EOF
+          
+          # Restrict file permissions immediately for runtime isolation security
+          chmod 600 ~/.dockstore/config
+          chmod 600 ~/.planemo/profiles/galaxy_profile/planemo_profile_options.json
+
+      # Step 4: Execute the galaxy_workflow_checker script inside the venv context
+      - name: Execute Workflow Checker Testing
+        run: |
+          source venv/bin/activate
+          
+          # Test 1: Verify the checker can read the profile configuration by testing a WorkflowHub ID
+          python galaxy_workflow_checker.py --source workflowhub --id 403
+          
+          # Test 2: (Optional validation) Run structural static check on any local file if present
+          # python galaxy_workflow_checker.py --local-file path_to_test_file.ga --static-only
+
+      # Step 5: Shred configuration data completely from the VM disk
+      - name: Securely Shred Credentials
+        if: always() # Forces this block to clean up even if the validation script throws errors
+        run: |
+          if [ -f ~/.dockstore/config ]; then 
+            shred -u ~/.dockstore/config
+          fi
+          if [ -f ~/.planemo/profiles/galaxy_profile/planemo_profile_options.json ]; then 
+            shred -u ~/.planemo/profiles/galaxy_profile/planemo_profile_options.json
+          fi
+          
+          # Remove directories completely
+          rm -rf ~/.dockstore
+          rm -rf ~/.planemo/profiles/galaxy_profile/
