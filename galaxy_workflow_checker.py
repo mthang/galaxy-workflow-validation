@@ -21,6 +21,12 @@ Usage examples:
 
   # List matching workflows without checking tools
   python galaxy_workflow_checker.py --source workflowhub --search "assembly" --list-only
+
+  # Check workflows from a CSV file
+  python galaxy_workflow_checker.py --csv workflows.csv
+
+  # With custom output and workspace
+  python galaxy_workflow_checker.py --csv workflows.csv --output my_report --workspace ./downloads
 """
 
 import json
@@ -64,6 +70,60 @@ def galaxy_instance_name(url: str) -> str:
     """Return a friendly name for a Galaxy URL, or the URL itself if unknown."""
     host = url.rstrip("/").split("//")[-1].split("/")[0]
     return GALAXY_INSTANCE_NAMES.get(host, url)
+
+
+# ---------------------------------------------------------------------------
+# Workflow Specification (for CSV input)
+# ---------------------------------------------------------------------------
+
+class WorkflowSpec:
+    """Represents a workflow to check, parsed from CSV or CLI args."""
+    
+    def __init__(self, name: str, registry: str, registry_id: str, version: str):
+        """
+        Initialize a workflow specification.
+        
+        Args:
+            name: Human-readable label for the workflow
+            registry: 'workflowhub' or 'dockstore'
+            registry_id: WorkflowHub numeric ID or Dockstore entry path
+            version: Version to check (e.g., 'v2.0.8', 'latest', 'main')
+        """
+        self.name = name
+        self.registry = registry.lower()
+        self.registry_id = registry_id.strip()
+        self.version = version
+    
+    @classmethod
+    def from_csv_row(cls, row: dict) -> 'WorkflowSpec':
+        """
+        Parse from CSV row with columns: name, registry, registry_id, recommended_version
+        
+        Expected columns:
+            name: human-readable label
+            registry: 'workflowhub' or 'dockstore'
+            registry_id: WorkflowHub numeric ID or Dockstore entry path
+            recommended_version: version to check (e.g., 'v2.0.8', 'Version 1', 'latest')
+        """
+        return cls(
+            name=row['name'].strip(),
+            registry=row['registry'].strip(),
+            registry_id=row['registry_id'].strip(),
+            version=row['recommended_version'].strip()
+        )
+    
+    @classmethod
+    def from_cli(cls, registry: str, identifier: str, version: str, name: str = None) -> 'WorkflowSpec':
+        """Create from CLI arguments."""
+        return cls(
+            name=name or identifier.split('/')[-1],
+            registry=registry,
+            registry_id=identifier,
+            version=version
+        )
+    
+    def __repr__(self) -> str:
+        return f"WorkflowSpec(name='{self.name}', registry={self.registry}, id={self.registry_id}, version={self.version})"
 
 
 # ---------------------------------------------------------------------------
@@ -939,6 +999,107 @@ def process_dockstore_workflow(entry: str, version_spec: str,
     return results
 
 
+def process_workflow_spec(spec: WorkflowSpec, workspace: Path, 
+                          tool_cache: Dict[str, set]) -> List[Dict]:
+    """
+    Process a single workflow specification from CSV.
+    
+    Args:
+        spec: WorkflowSpec object with name, registry, registry_id, version
+        workspace: Directory for downloaded files
+        tool_cache: Galaxy tool cache
+    
+    Returns:
+        List of result dicts (one per version checked)
+    """
+    print(f"\n{'='*60}")
+    print(f"Processing: {spec.name}")
+    print(f"  Registry: {spec.registry}")
+    print(f"  ID: {spec.registry_id}")
+    print(f"  Version: {spec.version}")
+    print(f"{'='*60}")
+    
+    if spec.registry == "workflowhub":
+        wf = get_workflowhub_workflow(spec.registry_id)
+        if not wf:
+            print(f"Error: WorkflowHub workflow ID {spec.registry_id} not found")
+            return []
+        # Override the workflow name with the CSV-provided name
+        wf['name'] = spec.name
+        return process_workflowhub_workflow(wf, spec.version, workspace, tool_cache)
+    
+    elif spec.registry == "dockstore":
+        return process_dockstore_workflow(spec.registry_id, spec.version, workspace, tool_cache)
+    
+    else:
+        print(f"Error: Unknown registry '{spec.registry}' for workflow {spec.name}")
+        return []
+
+
+def read_workflow_specs_from_csv(csv_path: str) -> List[WorkflowSpec]:
+    """
+    Read workflow specifications from CSV file.
+    
+    Expected columns:
+        name: human-readable label
+        registry: 'workflowhub' or 'dockstore'
+        registry_id: WorkflowHub numeric ID or Dockstore entry path
+        recommended_version: version to check (e.g., 'v2.0.8', 'Version 1', 'latest')
+    
+    Example CSV content:
+        name,registry,registry_id,recommended_version
+        Genome assessment,workflowhub,403,v2.0.8
+        Assembly pipeline,dockstore,github.com/iwc-workflows/Assembly/main,latest
+    """
+    import csv
+    
+    specs = []
+    try:
+        with open(csv_path, 'r') as f:
+            reader = csv.DictReader(f)
+            
+            # Validate required columns
+            required = {'name', 'registry', 'registry_id', 'recommended_version'}
+            if not required.issubset(reader.fieldnames):
+                missing = required - set(reader.fieldnames)
+                raise ValueError(f"CSV missing required columns: {missing}. "
+                               f"Need: {required}")
+            
+            for row_num, row in enumerate(reader, start=2):  # start=2 for header row
+                # Skip empty rows
+                if not any(row.values()):
+                    continue
+                
+                # Validate registry
+                registry = row['registry'].strip().lower()
+                if registry not in ('workflowhub', 'dockstore'):
+                    print(f"Warning: Row {row_num} has invalid registry '{registry}', skipping")
+                    continue
+                
+                # Validate required fields are not empty
+                if not row['name'].strip():
+                    print(f"Warning: Row {row_num} has empty name, skipping")
+                    continue
+                if not row['registry_id'].strip():
+                    print(f"Warning: Row {row_num} has empty registry_id, skipping")
+                    continue
+                if not row['recommended_version'].strip():
+                    print(f"Warning: Row {row_num} has empty recommended_version, skipping")
+                    continue
+                
+                spec = WorkflowSpec.from_csv_row(row)
+                specs.append(spec)
+                
+    except FileNotFoundError:
+        print(f"Error: CSV file not found: {csv_path}")
+        sys.exit(1)
+    except csv.Error as e:
+        print(f"Error parsing CSV file: {e}")
+        sys.exit(1)
+    
+    return specs
+
+
 # ---------------------------------------------------------------------------
 # Reporting
 # ---------------------------------------------------------------------------
@@ -1167,6 +1328,8 @@ def parse_args():
                              "Optionally append :version to pin a specific version, "
                              "e.g. --entry github.com/iwc-workflows/VGP3/main:v0.3.5. "
                              "Entries without a :version use --versions (default: latest).")
+    parser.add_argument("--csv", metavar="FILE.csv",
+                        help="CSV file with columns: name,registry,registry_id,recommended_version")
     parser.add_argument("--max-workflows", "-mw", type=int, default=10,
                         help="Max workflows to return from a search (default: 10)")
     # Version selection
@@ -1205,6 +1368,13 @@ def parse_args():
     # Validate combinations
     if args.static_only and not args.local_file:
         parser.error("--static-only requires --local-file")
+    
+    # CSV mode is exclusive with other workflow selection methods
+    if args.csv:
+        if args.search or args.id or args.entry:
+            parser.error("--csv cannot be used with --search, --id, or --entry")
+        return args
+    
     if args.local_file:
         if not Path(args.local_file).exists():
             parser.error(f"--local-file: file not found: {args.local_file}")
@@ -1215,7 +1385,7 @@ def parse_args():
     if args.source == "dockstore" and args.id:
         parser.error("--id is for WorkflowHub workflows; use --entry for Dockstore")
     if not any([args.search, args.id, args.entry]):
-        parser.error("Provide at least one of: --search, --id, --entry (or use --local-file)")
+        parser.error("Provide at least one of: --search, --id, --entry, --csv, or --local-file")
 
     return args
 
@@ -1266,6 +1436,45 @@ def main():
                 print(f"\nDockstore {entry}: {len(versions)} version(s)")
                 for v in versions:
                     print(f"  {v}")
+        return
+
+    # --- CSV mode ---
+    if args.csv:
+        print(f"\nReading workflow specifications from: {args.csv}")
+        specs = read_workflow_specs_from_csv(args.csv)
+        
+        if not specs:
+            print("No valid workflow specifications found in CSV file.")
+            return
+        
+        print(f"Loaded {len(specs)} workflow(s) from CSV")
+        
+        # Galaxy credentials are required for tool checking
+        galaxy_url, galaxy_key = read_planemo_profile(args.profile)
+        print(f"Galaxy URL : {galaxy_url}")
+        print(f"Profile    : {args.profile}")
+        
+        tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+        
+        all_results = []
+        for spec in specs:
+            results = process_workflow_spec(spec, workspace, tool_cache)
+            all_results.extend(results)
+        
+        if not all_results:
+            print("\nNo results to report.")
+            return
+        
+        report = generate_report(all_results, galaxy_url, args.profile)
+        display_summary(report)
+        
+        json_path = args.output + ".json"
+        txt_path  = args.output + ".txt"
+        
+        with open(json_path, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"JSON report  : {json_path}")
+        write_text_report(report, txt_path)
         return
 
     # --- Local file mode ---
@@ -1325,7 +1534,7 @@ def main():
         write_text_report(report, txt_path)
         return
 
-    # --- Tool checking mode ---
+    # --- Tool checking mode (CLI arguments) ---
     galaxy_url, galaxy_key = read_planemo_profile(args.profile)
     print(f"Galaxy URL : {galaxy_url}")
     print(f"Profile    : {args.profile}")
