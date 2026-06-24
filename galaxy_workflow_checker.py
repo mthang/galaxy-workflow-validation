@@ -25,6 +25,10 @@ Usage examples:
   # Check workflows from a CSV file
   python galaxy_workflow_checker.py --csv workflows.csv
 
+  # Keyless: check a public Galaxy server with NO API key or Planemo profile
+  python galaxy_workflow_checker.py --source workflowhub --id 403 \
+      --galaxy-url https://usegalaxy.org.au
+
   # With custom output and workspace
   python galaxy_workflow_checker.py --csv workflows.csv --output my_report --workspace ./downloads
 """
@@ -154,12 +158,31 @@ def read_planemo_profile(profile_name: str) -> Tuple[str, str]:
 # Galaxy tool cache
 # ---------------------------------------------------------------------------
 
-def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> Dict[str, set]:
+def _cache_from_tool_list(tools: List[Dict]) -> Dict[str, set]:
     """
-    Fetch all tools installed in Galaxy and return a mapping of
-    base tool ID -> set of installed versions.
+    Build a mapping of base tool ID -> set of installed versions from a
+    Galaxy /api/tools tool list (as returned by BioBlend's get_tools() or the
+    public /api/tools?in_panel=false endpoint).
     Base ID format: toolshed.g2.bx.psu.edu/repos/{owner}/{repo}/{toolname}
     Version format: {x.y.z}+galaxyN (or whatever suffix convention is used)
+    """
+    cache: Dict[str, set] = {}
+    for t in tools:
+        tid = t.get("id", "")
+        if "toolshed" in tid:
+            # toolshed.g2.bx.psu.edu/repos/owner/repo/toolname/version
+            parts = tid.split("/")
+            if len(parts) >= 6:
+                base = "/".join(parts[:5])
+                version = parts[5]
+                cache.setdefault(base, set()).add(version)
+    return cache
+
+
+def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> Dict[str, set]:
+    """
+    Fetch all tools installed in Galaxy (authenticated, via BioBlend) and return
+    a mapping of base tool ID -> set of installed versions.
     """
     if not BIOBLEND_AVAILABLE:
         print("Error: BioBlend required for Galaxy tool checking.")
@@ -171,18 +194,61 @@ def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> Dict[str, set]:
     except Exception as e:
         print(f"Error: Could not retrieve tools from Galaxy: {e}")
         sys.exit(1)
-    cache: Dict[str, set] = {}
-    for t in tools:
-        tid = t.get("id", "")
-        if "toolshed" in tid:
-            # toolshed.g2.bx.psu.edu/repos/owner/repo/toolname/version
-            parts = tid.split("/")
-            if len(parts) >= 6:
-                base = "/".join(parts[:5])
-                version = parts[5]
-                cache.setdefault(base, set()).add(version)
+    cache = _cache_from_tool_list(tools)
     print(f"  Found {len(tools)} tools installed ({len(cache)} unique ToolShed tools)")
     return cache
+
+
+def build_galaxy_tool_cache_public(galaxy_url: str) -> Dict[str, set]:
+    """
+    Fetch the tool list from a Galaxy instance's public /api/tools endpoint
+    WITHOUT an API key, and return the same base tool ID -> versions mapping as
+    build_galaxy_tool_cache.
+
+    Works for instances whose tool panel is publicly readable (e.g. Galaxy
+    Australia and the other public usegalaxy.* servers). For private instances
+    that require authentication, use a Planemo profile (keyed access) instead.
+    """
+    api_url = galaxy_url.rstrip("/") + "/api/tools?in_panel=false"
+    print(f"\nFetching public tool panel from {api_url} ...")
+    req = urllib.request.Request(api_url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            tools = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        print(f"Error: HTTP {e.code} fetching public tool list from {api_url}")
+        print("  This instance may not expose its tool list publicly; "
+              "use a Planemo profile (keyed access) via --profile instead.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Could not retrieve public tool list: {e}")
+        sys.exit(1)
+    cache = _cache_from_tool_list(tools)
+    print(f"  Found {len(tools)} tools installed ({len(cache)} unique ToolShed tools)")
+    return cache
+
+
+def resolve_galaxy_and_cache(args) -> Tuple[str, Dict[str, set], str]:
+    """
+    Resolve the target Galaxy instance and build its tool cache, choosing between:
+      * Keyless public mode -- if --galaxy-url is given, read the public tool
+        panel directly (no API key, no Planemo profile needed).
+      * Keyed profile mode  -- otherwise read URL + key from the Planemo profile.
+
+    Returns (galaxy_url, tool_cache, source_label), where source_label is shown
+    in the report in place of a profile name.
+    """
+    if args.galaxy_url:
+        galaxy_url = args.galaxy_url.rstrip("/")
+        print(f"Galaxy URL : {galaxy_url}")
+        print(f"Access     : public tool panel (keyless, no profile)")
+        tool_cache = build_galaxy_tool_cache_public(galaxy_url)
+        return galaxy_url, tool_cache, "none (keyless public access)"
+    galaxy_url, galaxy_key = read_planemo_profile(args.profile)
+    print(f"Galaxy URL : {galaxy_url}")
+    print(f"Profile    : {args.profile}")
+    tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+    return galaxy_url, tool_cache, args.profile
 
 
 # ---------------------------------------------------------------------------
@@ -1341,6 +1407,12 @@ def parse_args():
     parser.add_argument("--profile", default="galaxy_profile",
                         help="Planemo profile name to read Galaxy credentials from "
                              "(default: galaxy_profile)")
+    parser.add_argument("--galaxy-url",
+                        help="Target Galaxy URL for keyless public access, e.g. "
+                             "https://usegalaxy.org.au . Reads the public tool panel "
+                             "directly with NO API key or Planemo profile. Use for "
+                             "public instances; takes precedence over --profile. For "
+                             "private instances, use --profile instead.")
     # Output
     parser.add_argument("--output", "-o", default="workflow_check_report",
                         help="Base name for output files, no extension "
@@ -1449,12 +1521,8 @@ def main():
         
         print(f"Loaded {len(specs)} workflow(s) from CSV")
         
-        # Galaxy credentials are required for tool checking
-        galaxy_url, galaxy_key = read_planemo_profile(args.profile)
-        print(f"Galaxy URL : {galaxy_url}")
-        print(f"Profile    : {args.profile}")
-        
-        tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+        # Resolve Galaxy target and build the tool cache (keyed profile or keyless public)
+        galaxy_url, tool_cache, source_label = resolve_galaxy_and_cache(args)
         
         all_results = []
         for spec in specs:
@@ -1465,7 +1533,7 @@ def main():
             print("\nNo results to report.")
             return
         
-        report = generate_report(all_results, galaxy_url, args.profile)
+        report = generate_report(all_results, galaxy_url, source_label)
         display_summary(report)
         
         json_path = args.output + ".json"
@@ -1509,11 +1577,8 @@ def main():
                 print("\n(Wiring and tool checks skipped — structural FAIL)")
             return
 
-        # Full check (static + tool availability)
-        galaxy_url, galaxy_key = read_planemo_profile(args.profile)
-        print(f"Galaxy URL : {galaxy_url}")
-        print(f"Profile    : {args.profile}")
-        tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+        # Full check (static + tool availability): resolve Galaxy + build tool cache
+        galaxy_url, tool_cache, source_label = resolve_galaxy_and_cache(args)
 
         workflow_info = {"name": wf_name, "id": wf_name, "url": str(ga_path.resolve())}
         result = check_workflow_version(
@@ -1524,7 +1589,7 @@ def main():
             tool_cache=tool_cache,
         )
         all_results = [result]
-        report = generate_report(all_results, galaxy_url, args.profile)
+        report = generate_report(all_results, galaxy_url, source_label)
         display_summary(report)
         json_path = args.output + ".json"
         txt_path  = args.output + ".txt"
@@ -1535,11 +1600,7 @@ def main():
         return
 
     # --- Tool checking mode (CLI arguments) ---
-    galaxy_url, galaxy_key = read_planemo_profile(args.profile)
-    print(f"Galaxy URL : {galaxy_url}")
-    print(f"Profile    : {args.profile}")
-
-    tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+    galaxy_url, tool_cache, source_label = resolve_galaxy_and_cache(args)
 
     all_results = []
 
@@ -1583,7 +1644,7 @@ def main():
         print("\nNo results to report.")
         return
 
-    report = generate_report(all_results, galaxy_url, args.profile)
+    report = generate_report(all_results, galaxy_url, source_label)
     display_summary(report)
 
     json_path = args.output + ".json"
