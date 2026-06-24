@@ -21,6 +21,16 @@ Usage examples:
 
   # List matching workflows without checking tools
   python galaxy_workflow_checker.py --source workflowhub --search "assembly" --list-only
+
+  # Check workflows from a CSV file
+  python galaxy_workflow_checker.py --csv workflows.csv
+
+  # Keyless: check a public Galaxy server with NO API key or Planemo profile
+  python galaxy_workflow_checker.py --source workflowhub --id 403 \
+      --galaxy-url https://usegalaxy.org.au
+
+  # With custom output and workspace
+  python galaxy_workflow_checker.py --csv workflows.csv --output my_report --workspace ./downloads
 """
 
 import json
@@ -67,6 +77,60 @@ def galaxy_instance_name(url: str) -> str:
 
 
 # ---------------------------------------------------------------------------
+# Workflow Specification (for CSV input)
+# ---------------------------------------------------------------------------
+
+class WorkflowSpec:
+    """Represents a workflow to check, parsed from CSV or CLI args."""
+    
+    def __init__(self, name: str, registry: str, registry_id: str, version: str):
+        """
+        Initialize a workflow specification.
+        
+        Args:
+            name: Human-readable label for the workflow
+            registry: 'workflowhub' or 'dockstore'
+            registry_id: WorkflowHub numeric ID or Dockstore entry path
+            version: Version to check (e.g., 'v2.0.8', 'latest', 'main')
+        """
+        self.name = name
+        self.registry = registry.lower()
+        self.registry_id = registry_id.strip()
+        self.version = version
+    
+    @classmethod
+    def from_csv_row(cls, row: dict) -> 'WorkflowSpec':
+        """
+        Parse from CSV row with columns: name, registry, registry_id, recommended_version
+        
+        Expected columns:
+            name: human-readable label
+            registry: 'workflowhub' or 'dockstore'
+            registry_id: WorkflowHub numeric ID or Dockstore entry path
+            recommended_version: version to check (e.g., 'v2.0.8', 'Version 1', 'latest')
+        """
+        return cls(
+            name=row['name'].strip(),
+            registry=row['registry'].strip(),
+            registry_id=row['registry_id'].strip(),
+            version=row['recommended_version'].strip()
+        )
+    
+    @classmethod
+    def from_cli(cls, registry: str, identifier: str, version: str, name: str = None) -> 'WorkflowSpec':
+        """Create from CLI arguments."""
+        return cls(
+            name=name or identifier.split('/')[-1],
+            registry=registry,
+            registry_id=identifier,
+            version=version
+        )
+    
+    def __repr__(self) -> str:
+        return f"WorkflowSpec(name='{self.name}', registry={self.registry}, id={self.registry_id}, version={self.version})"
+
+
+# ---------------------------------------------------------------------------
 # Credentials
 # ---------------------------------------------------------------------------
 
@@ -94,12 +158,31 @@ def read_planemo_profile(profile_name: str) -> Tuple[str, str]:
 # Galaxy tool cache
 # ---------------------------------------------------------------------------
 
-def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> Dict[str, set]:
+def _cache_from_tool_list(tools: List[Dict]) -> Dict[str, set]:
     """
-    Fetch all tools installed in Galaxy and return a mapping of
-    base tool ID -> set of installed versions.
+    Build a mapping of base tool ID -> set of installed versions from a
+    Galaxy /api/tools tool list (as returned by BioBlend's get_tools() or the
+    public /api/tools?in_panel=false endpoint).
     Base ID format: toolshed.g2.bx.psu.edu/repos/{owner}/{repo}/{toolname}
     Version format: {x.y.z}+galaxyN (or whatever suffix convention is used)
+    """
+    cache: Dict[str, set] = {}
+    for t in tools:
+        tid = t.get("id", "")
+        if "toolshed" in tid:
+            # toolshed.g2.bx.psu.edu/repos/owner/repo/toolname/version
+            parts = tid.split("/")
+            if len(parts) >= 6:
+                base = "/".join(parts[:5])
+                version = parts[5]
+                cache.setdefault(base, set()).add(version)
+    return cache
+
+
+def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> Dict[str, set]:
+    """
+    Fetch all tools installed in Galaxy (authenticated, via BioBlend) and return
+    a mapping of base tool ID -> set of installed versions.
     """
     if not BIOBLEND_AVAILABLE:
         print("Error: BioBlend required for Galaxy tool checking.")
@@ -111,18 +194,61 @@ def build_galaxy_tool_cache(galaxy_url: str, galaxy_key: str) -> Dict[str, set]:
     except Exception as e:
         print(f"Error: Could not retrieve tools from Galaxy: {e}")
         sys.exit(1)
-    cache: Dict[str, set] = {}
-    for t in tools:
-        tid = t.get("id", "")
-        if "toolshed" in tid:
-            # toolshed.g2.bx.psu.edu/repos/owner/repo/toolname/version
-            parts = tid.split("/")
-            if len(parts) >= 6:
-                base = "/".join(parts[:5])
-                version = parts[5]
-                cache.setdefault(base, set()).add(version)
+    cache = _cache_from_tool_list(tools)
     print(f"  Found {len(tools)} tools installed ({len(cache)} unique ToolShed tools)")
     return cache
+
+
+def build_galaxy_tool_cache_public(galaxy_url: str) -> Dict[str, set]:
+    """
+    Fetch the tool list from a Galaxy instance's public /api/tools endpoint
+    WITHOUT an API key, and return the same base tool ID -> versions mapping as
+    build_galaxy_tool_cache.
+
+    Works for instances whose tool panel is publicly readable (e.g. Galaxy
+    Australia and the other public usegalaxy.* servers). For private instances
+    that require authentication, use a Planemo profile (keyed access) instead.
+    """
+    api_url = galaxy_url.rstrip("/") + "/api/tools?in_panel=false"
+    print(f"\nFetching public tool panel from {api_url} ...")
+    req = urllib.request.Request(api_url, headers={"Accept": "application/json"})
+    try:
+        with urllib.request.urlopen(req, timeout=60) as resp:
+            tools = json.loads(resp.read().decode())
+    except urllib.error.HTTPError as e:
+        print(f"Error: HTTP {e.code} fetching public tool list from {api_url}")
+        print("  This instance may not expose its tool list publicly; "
+              "use a Planemo profile (keyed access) via --profile instead.")
+        sys.exit(1)
+    except Exception as e:
+        print(f"Error: Could not retrieve public tool list: {e}")
+        sys.exit(1)
+    cache = _cache_from_tool_list(tools)
+    print(f"  Found {len(tools)} tools installed ({len(cache)} unique ToolShed tools)")
+    return cache
+
+
+def resolve_galaxy_and_cache(args) -> Tuple[str, Dict[str, set], str]:
+    """
+    Resolve the target Galaxy instance and build its tool cache, choosing between:
+      * Keyless public mode -- if --galaxy-url is given, read the public tool
+        panel directly (no API key, no Planemo profile needed).
+      * Keyed profile mode  -- otherwise read URL + key from the Planemo profile.
+
+    Returns (galaxy_url, tool_cache, source_label), where source_label is shown
+    in the report in place of a profile name.
+    """
+    if args.galaxy_url:
+        galaxy_url = args.galaxy_url.rstrip("/")
+        print(f"Galaxy URL : {galaxy_url}")
+        print(f"Access     : public tool panel (keyless, no profile)")
+        tool_cache = build_galaxy_tool_cache_public(galaxy_url)
+        return galaxy_url, tool_cache, "none (keyless public access)"
+    galaxy_url, galaxy_key = read_planemo_profile(args.profile)
+    print(f"Galaxy URL : {galaxy_url}")
+    print(f"Profile    : {args.profile}")
+    tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+    return galaxy_url, tool_cache, args.profile
 
 
 # ---------------------------------------------------------------------------
@@ -939,6 +1065,107 @@ def process_dockstore_workflow(entry: str, version_spec: str,
     return results
 
 
+def process_workflow_spec(spec: WorkflowSpec, workspace: Path, 
+                          tool_cache: Dict[str, set]) -> List[Dict]:
+    """
+    Process a single workflow specification from CSV.
+    
+    Args:
+        spec: WorkflowSpec object with name, registry, registry_id, version
+        workspace: Directory for downloaded files
+        tool_cache: Galaxy tool cache
+    
+    Returns:
+        List of result dicts (one per version checked)
+    """
+    print(f"\n{'='*60}")
+    print(f"Processing: {spec.name}")
+    print(f"  Registry: {spec.registry}")
+    print(f"  ID: {spec.registry_id}")
+    print(f"  Version: {spec.version}")
+    print(f"{'='*60}")
+    
+    if spec.registry == "workflowhub":
+        wf = get_workflowhub_workflow(spec.registry_id)
+        if not wf:
+            print(f"Error: WorkflowHub workflow ID {spec.registry_id} not found")
+            return []
+        # Override the workflow name with the CSV-provided name
+        wf['name'] = spec.name
+        return process_workflowhub_workflow(wf, spec.version, workspace, tool_cache)
+    
+    elif spec.registry == "dockstore":
+        return process_dockstore_workflow(spec.registry_id, spec.version, workspace, tool_cache)
+    
+    else:
+        print(f"Error: Unknown registry '{spec.registry}' for workflow {spec.name}")
+        return []
+
+
+def read_workflow_specs_from_csv(csv_path: str) -> List[WorkflowSpec]:
+    """
+    Read workflow specifications from CSV file.
+    
+    Expected columns:
+        name: human-readable label
+        registry: 'workflowhub' or 'dockstore'
+        registry_id: WorkflowHub numeric ID or Dockstore entry path
+        recommended_version: version to check (e.g., 'v2.0.8', 'Version 1', 'latest')
+    
+    Example CSV content:
+        name,registry,registry_id,recommended_version
+        Genome assessment,workflowhub,403,v2.0.8
+        Assembly pipeline,dockstore,github.com/iwc-workflows/Assembly/main,latest
+    """
+    import csv
+    
+    specs = []
+    try:
+        with open(csv_path, 'r') as f:
+            reader = csv.DictReader(f)
+            
+            # Validate required columns
+            required = {'name', 'registry', 'registry_id', 'recommended_version'}
+            if not required.issubset(reader.fieldnames):
+                missing = required - set(reader.fieldnames)
+                raise ValueError(f"CSV missing required columns: {missing}. "
+                               f"Need: {required}")
+            
+            for row_num, row in enumerate(reader, start=2):  # start=2 for header row
+                # Skip empty rows
+                if not any(row.values()):
+                    continue
+                
+                # Validate registry
+                registry = row['registry'].strip().lower()
+                if registry not in ('workflowhub', 'dockstore'):
+                    print(f"Warning: Row {row_num} has invalid registry '{registry}', skipping")
+                    continue
+                
+                # Validate required fields are not empty
+                if not row['name'].strip():
+                    print(f"Warning: Row {row_num} has empty name, skipping")
+                    continue
+                if not row['registry_id'].strip():
+                    print(f"Warning: Row {row_num} has empty registry_id, skipping")
+                    continue
+                if not row['recommended_version'].strip():
+                    print(f"Warning: Row {row_num} has empty recommended_version, skipping")
+                    continue
+                
+                spec = WorkflowSpec.from_csv_row(row)
+                specs.append(spec)
+                
+    except FileNotFoundError:
+        print(f"Error: CSV file not found: {csv_path}")
+        sys.exit(1)
+    except csv.Error as e:
+        print(f"Error parsing CSV file: {e}")
+        sys.exit(1)
+    
+    return specs
+
+
 # ---------------------------------------------------------------------------
 # Reporting
 # ---------------------------------------------------------------------------
@@ -1167,6 +1394,8 @@ def parse_args():
                              "Optionally append :version to pin a specific version, "
                              "e.g. --entry github.com/iwc-workflows/VGP3/main:v0.3.5. "
                              "Entries without a :version use --versions (default: latest).")
+    parser.add_argument("--csv", metavar="FILE.csv",
+                        help="CSV file with columns: name,registry,registry_id,recommended_version")
     parser.add_argument("--max-workflows", "-mw", type=int, default=10,
                         help="Max workflows to return from a search (default: 10)")
     # Version selection
@@ -1178,6 +1407,12 @@ def parse_args():
     parser.add_argument("--profile", default="galaxy_profile",
                         help="Planemo profile name to read Galaxy credentials from "
                              "(default: galaxy_profile)")
+    parser.add_argument("--galaxy-url",
+                        help="Target Galaxy URL for keyless public access, e.g. "
+                             "https://usegalaxy.org.au . Reads the public tool panel "
+                             "directly with NO API key or Planemo profile. Use for "
+                             "public instances; takes precedence over --profile. For "
+                             "private instances, use --profile instead.")
     # Output
     parser.add_argument("--output", "-o", default="workflow_check_report",
                         help="Base name for output files, no extension "
@@ -1205,6 +1440,13 @@ def parse_args():
     # Validate combinations
     if args.static_only and not args.local_file:
         parser.error("--static-only requires --local-file")
+    
+    # CSV mode is exclusive with other workflow selection methods
+    if args.csv:
+        if args.search or args.id or args.entry:
+            parser.error("--csv cannot be used with --search, --id, or --entry")
+        return args
+    
     if args.local_file:
         if not Path(args.local_file).exists():
             parser.error(f"--local-file: file not found: {args.local_file}")
@@ -1215,7 +1457,7 @@ def parse_args():
     if args.source == "dockstore" and args.id:
         parser.error("--id is for WorkflowHub workflows; use --entry for Dockstore")
     if not any([args.search, args.id, args.entry]):
-        parser.error("Provide at least one of: --search, --id, --entry (or use --local-file)")
+        parser.error("Provide at least one of: --search, --id, --entry, --csv, or --local-file")
 
     return args
 
@@ -1268,6 +1510,41 @@ def main():
                     print(f"  {v}")
         return
 
+    # --- CSV mode ---
+    if args.csv:
+        print(f"\nReading workflow specifications from: {args.csv}")
+        specs = read_workflow_specs_from_csv(args.csv)
+        
+        if not specs:
+            print("No valid workflow specifications found in CSV file.")
+            return
+        
+        print(f"Loaded {len(specs)} workflow(s) from CSV")
+        
+        # Resolve Galaxy target and build the tool cache (keyed profile or keyless public)
+        galaxy_url, tool_cache, source_label = resolve_galaxy_and_cache(args)
+        
+        all_results = []
+        for spec in specs:
+            results = process_workflow_spec(spec, workspace, tool_cache)
+            all_results.extend(results)
+        
+        if not all_results:
+            print("\nNo results to report.")
+            return
+        
+        report = generate_report(all_results, galaxy_url, source_label)
+        display_summary(report)
+        
+        json_path = args.output + ".json"
+        txt_path  = args.output + ".txt"
+        
+        with open(json_path, "w") as f:
+            json.dump(report, f, indent=2)
+        print(f"JSON report  : {json_path}")
+        write_text_report(report, txt_path)
+        return
+
     # --- Local file mode ---
     if args.local_file:
         ga_path = Path(args.local_file)
@@ -1300,11 +1577,8 @@ def main():
                 print("\n(Wiring and tool checks skipped — structural FAIL)")
             return
 
-        # Full check (static + tool availability)
-        galaxy_url, galaxy_key = read_planemo_profile(args.profile)
-        print(f"Galaxy URL : {galaxy_url}")
-        print(f"Profile    : {args.profile}")
-        tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+        # Full check (static + tool availability): resolve Galaxy + build tool cache
+        galaxy_url, tool_cache, source_label = resolve_galaxy_and_cache(args)
 
         workflow_info = {"name": wf_name, "id": wf_name, "url": str(ga_path.resolve())}
         result = check_workflow_version(
@@ -1315,7 +1589,7 @@ def main():
             tool_cache=tool_cache,
         )
         all_results = [result]
-        report = generate_report(all_results, galaxy_url, args.profile)
+        report = generate_report(all_results, galaxy_url, source_label)
         display_summary(report)
         json_path = args.output + ".json"
         txt_path  = args.output + ".txt"
@@ -1325,12 +1599,8 @@ def main():
         write_text_report(report, txt_path)
         return
 
-    # --- Tool checking mode ---
-    galaxy_url, galaxy_key = read_planemo_profile(args.profile)
-    print(f"Galaxy URL : {galaxy_url}")
-    print(f"Profile    : {args.profile}")
-
-    tool_cache = build_galaxy_tool_cache(galaxy_url, galaxy_key)
+    # --- Tool checking mode (CLI arguments) ---
+    galaxy_url, tool_cache, source_label = resolve_galaxy_and_cache(args)
 
     all_results = []
 
@@ -1374,7 +1644,7 @@ def main():
         print("\nNo results to report.")
         return
 
-    report = generate_report(all_results, galaxy_url, args.profile)
+    report = generate_report(all_results, galaxy_url, source_label)
     display_summary(report)
 
     json_path = args.output + ".json"
