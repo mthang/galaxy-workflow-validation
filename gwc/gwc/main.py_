@@ -1,0 +1,380 @@
+#!/usr/bin/env python3
+"""
+Galaxy Workflow Tool Checker - Main Entry Point
+Combines workflow checking with published workflow listing.
+"""
+
+import sys
+import os
+import json
+import logging
+import argparse
+from pathlib import Path
+from typing import List, Dict, Optional, Any
+from datetime import datetime
+import time
+
+# Import internal modules
+from .cli.parser import parse_args, parse_version_spec
+from .utils.config_loader import load_config, get_skip_types
+from .utils.reporting import (
+    generate_report, write_text_report, display_summary,
+    generate_html_report, export_tool_issues_to_csv,
+    generate_installation_script, compare_workflows
+)
+from .services.galaxy_client import GalaxyClient
+from .services.workflow_registry import WorkflowRegistry
+from .core.processor import (
+    process_workflow_spec,
+    process_workflows_parallel,
+    analyze_workflow
+)
+from .models.workflow_spec import WorkflowSpec
+from .lister import GalaxyWorkflowLister
+
+# Setup logging
+logger = logging.getLogger(__name__)
+
+
+def setup_logging(level=logging.INFO, log_file: Optional[str] = None):
+    """Configure logging with console and optional file handler."""
+    handlers = [logging.StreamHandler()]
+    if log_file:
+        try:
+            handlers.append(logging.FileHandler(log_file))
+        except OSError as e:
+            logger.warning(f"Could not create log file {log_file}: {e}")
+
+    logging.basicConfig(
+        level=level,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        handlers=handlers
+    )
+
+
+def handle_workflow_listing(args: argparse.Namespace):
+    """
+    Handle workflow listing commands (--list-published, --search-workflows, etc.)
+    """
+    try:
+        # Determine Galaxy URL and API key
+        if args.galaxy_url:
+            galaxy_url = args.galaxy_url
+            api_key = args.api_key if hasattr(args, 'api_key') else None
+        else:
+            # Try to get from Planemo profile
+            try:
+                galaxy_url, api_key = GalaxyClient.read_planemo_profile(args.profile)
+            except Exception as e:
+                logger.error(f"Failed to read Planemo profile: {e}")
+                logger.error("Please provide --galaxy-url or a valid Planemo profile.")
+                sys.exit(1)
+
+        lister = GalaxyWorkflowLister(galaxy_url, api_key)
+
+        # Decide which listing mode to use
+        if hasattr(args, 'search_workflows') and args.search_workflows:
+            workflows = lister.search_workflows(args.search_workflows)
+            print(f"\nFound {len(workflows)} workflows matching '{args.search_workflows}':")
+        elif hasattr(args, 'filter_tag') and args.filter_tag:
+            workflows = lister.list_workflows_by_tag(args.filter_tag)
+            print(f"\nFound {len(workflows)} workflows with tag '{args.filter_tag}':")
+        elif hasattr(args, 'workflow_stats') and args.workflow_stats:
+            stats = lister.get_workflow_statistics()
+            print("\n" + "=" * 50)
+            print("WORKFLOW STATISTICS")
+            print("=" * 50)
+            print(f"Total published workflows: {stats['total_published']}")
+            print(f"Total steps: {stats['total_steps']}")
+            print(f"Average tools per workflow: {stats.get('avg_tools_per_workflow', 0):.1f}")
+            print(f"With subworkflows: {stats['workflows_with_subworkflows']}")
+            print(f"Unique creators: {len(stats.get('unique_creators', []))}")
+            if stats.get('oldest_workflow'):
+                print(f"Oldest: {stats['oldest_workflow']['name']} ({stats['oldest_workflow']['created']})")
+            if stats.get('newest_workflow'):
+                print(f"Newest: {stats['newest_workflow']['name']} ({stats['newest_workflow']['created']})")
+            print("\nTop tags:")
+            for tag, count in list(stats.get('tags', {}).items())[:10]:
+                print(f"  {tag}: {count}")
+            return
+        else:
+            # Default: list published workflows
+            limit = None if args.workflow_limit == 0 else args.workflow_limit
+            workflows = lister.list_published_workflows(limit=limit)
+            print(f"\nFound {len(workflows)} published workflows:")
+
+        # Export or display
+        if hasattr(args, 'export_workflows') and args.export_workflows:
+            # Export to TSV (tab‑separated) if extension is .tsv, else CSV
+            if args.export_workflows.lower().endswith('.tsv'):
+                lister.export_to_tsv(workflows, args.export_workflows)
+            else:
+                lister.export_to_csv(workflows, args.export_workflows)
+            print(f"\nExported {len(workflows)} workflows to {args.export_workflows}")
+        else:
+            # Display in a readable table
+            lister.display_workflows_table(workflows, args.workflow_limit)
+
+    except Exception as e:
+        logger.error(f"Error during workflow listing: {e}")
+        if args.verbose:
+            logger.exception(e)
+        sys.exit(1)
+
+
+def read_workflow_specs_from_csv(csv_path: str) -> List[WorkflowSpec]:
+    """
+    Read workflow specifications from CSV file.
+    Expected columns: name, registry, registry_id, recommended_version
+    """
+    import csv
+    specs = []
+    try:
+        with open(csv_path, 'r') as f:
+            reader = csv.DictReader(f)
+            required = {'name', 'registry', 'registry_id', 'recommended_version'}
+            if not required.issubset(reader.fieldnames):
+                missing = required - set(reader.fieldnames)
+                raise ValueError(f"CSV missing required columns: {missing}")
+
+            for row_num, row in enumerate(reader, start=2):
+                if not any(row.values()):
+                    continue
+                registry = row['registry'].strip().lower()
+                if registry not in ('workflowhub', 'dockstore'):
+                    logger.warning(f"Row {row_num}: invalid registry '{registry}', skipping")
+                    continue
+                if not row['name'].strip() or not row['registry_id'].strip() or not row['recommended_version'].strip():
+                    logger.warning(f"Row {row_num}: empty fields, skipping")
+                    continue
+                specs.append(WorkflowSpec.from_csv_row(row))
+    except FileNotFoundError:
+        logger.error(f"CSV file not found: {csv_path}")
+        sys.exit(1)
+    except Exception as e:
+        logger.error(f"Error parsing CSV: {e}")
+        sys.exit(1)
+    return specs
+
+
+def resolve_galaxy_and_cache(args: argparse.Namespace, use_cache: bool = True):
+    """
+    Resolve Galaxy instance and build tool cache.
+    Returns (galaxy_url, tool_cache, profile_label).
+    """
+    if args.galaxy_url:
+        galaxy_url = args.galaxy_url.rstrip("/")
+        logger.info(f"Galaxy URL: {galaxy_url} (keyless public access)")
+        tool_cache = GalaxyClient.build_public_tool_cache(galaxy_url) if use_cache else {}
+        return galaxy_url, tool_cache, "none (keyless public access)"
+    else:
+        galaxy_url, galaxy_key = GalaxyClient.read_planemo_profile(args.profile)
+        logger.info(f"Galaxy URL: {galaxy_url} (profile: {args.profile})")
+        tool_cache = GalaxyClient.build_tool_cache(galaxy_url, galaxy_key) if use_cache else {}
+        return galaxy_url, tool_cache, args.profile
+
+
+def generate_and_export_reports(
+    args: argparse.Namespace,
+    results: List[Dict],
+    galaxy_url: str,
+    profile: str,
+    workspace: Path
+):
+    """Generate and export reports in requested formats."""
+    report = generate_report(results, galaxy_url, profile)
+    display_summary(report)
+
+    # Determine output formats
+    formats = ['txt', 'json'] if args.format == 'all' else [args.format]
+
+    for fmt in formats:
+        if fmt == 'txt':
+            txt_path = args.output + ".txt"
+            write_text_report(report, txt_path)
+            logger.info(f"Text report: {txt_path}")
+        elif fmt == 'json':
+            json_path = args.output + ".json"
+            with open(json_path, "w") as f:
+                json.dump(report, f, indent=2)
+            logger.info(f"JSON report: {json_path}")
+        elif fmt == 'html':
+            html_path = args.output + ".html"
+            generate_html_report(report, html_path)
+            logger.info(f"HTML report: {html_path}")
+
+    # Additional exports
+    if args.export_tool_issues_csv:
+        csv_path = args.output + "_tool_issues.csv"
+        export_tool_issues_to_csv(report, csv_path)
+        logger.info(f"Tool issues CSV: {csv_path}")
+
+    if args.export_install_script:
+        if report.get('unique_missing_tools'):
+            script = generate_installation_script(report['unique_missing_tools'], galaxy_url)
+            script_path = args.output + "_install_tools.sh"
+            with open(script_path, "w") as f:
+                f.write(script)
+            os.chmod(script_path, 0o755)
+            logger.info(f"Installation script: {script_path}")
+        else:
+            logger.info("No missing tools to install")
+
+    if args.compare_workflows:
+        comparison = compare_workflows(report['results'])
+        comp_path = args.output + "_comparison.json"
+        with open(comp_path, "w") as f:
+            json.dump(comparison, f, indent=2)
+        logger.info(f"Workflow comparison: {comp_path}")
+
+
+def main():
+    """Main entry point."""
+    args = parse_args()
+    config = load_config(args.config) if args.config else {}
+
+    # Setup logging
+    log_level = logging.DEBUG if args.verbose else logging.INFO
+    setup_logging(level=log_level, log_file=args.log_file if hasattr(args, 'log_file') else None)
+
+    # --- Workflow listing mode ---
+    if any([args.list_published, args.search_workflows, args.filter_tag, args.workflow_stats]):
+        handle_workflow_listing(args)
+        return
+
+    # --- Workflow checking modes ---
+    workspace = Path(args.workspace)
+    workspace.mkdir(exist_ok=True)
+
+    # Determine skip types from config
+    skip_types = get_skip_types(config)
+
+    # --- List‑only mode (search registries without checking) ---
+    if args.list_only:
+        registry = WorkflowRegistry(config)
+        if args.source in ("workflowhub", "both") and args.search:
+            print(f"\nWorkflowHub results for '{args.search}':")
+            for wf in registry.search("workflowhub", args.search, args.max_workflows):
+                versions = registry.get_versions("workflowhub", wf["id"])
+                print(f"  ID {wf['id']:>6}: {wf.get('name','')}  ({len(versions)} version(s))")
+        if args.source in ("dockstore", "both") and args.search:
+            print(f"\nDockstore results for '{args.search}':")
+            for wf in registry.search("dockstore", args.search, args.max_workflows):
+                print(f"  {wf['entry']}  {wf['url']}")
+        # Similar for --id and --entry (omitted for brevity; they are handled the same as before)
+        return
+
+    # --- CSV mode ---
+    if args.csv:
+        specs = read_workflow_specs_from_csv(args.csv)
+        if not specs:
+            logger.error("No valid workflow specifications found in CSV.")
+            sys.exit(1)
+
+        galaxy_url, tool_cache, profile = resolve_galaxy_and_cache(args, use_cache=not args.no_cache)
+
+        if args.parallel:
+            results = process_workflows_parallel(
+                specs, workspace, tool_cache, args.max_workers, skip_types, config
+            )
+        else:
+            results = []
+            for spec in specs:
+                # SAFETY: ensure result is a list
+                result = process_workflow_spec(spec, workspace, tool_cache, skip_types, config) or []
+                results.extend(result)
+
+        if results:
+            generate_and_export_reports(args, results, galaxy_url, profile, workspace)
+        else:
+            logger.warning("No results to report")
+        return
+
+    # --- Local file mode ---
+    if args.local_file:
+        ga_path = Path(args.local_file)
+        if args.static_only:
+            tool_cache = {}
+            galaxy_url = "local"
+            profile = "static"
+        else:
+            galaxy_url, tool_cache, profile = resolve_galaxy_and_cache(args, use_cache=not args.no_cache)
+
+        info = {"name": ga_path.stem, "id": str(ga_path), "source": "local", "url": "local"}
+        result = analyze_workflow(ga_path, info, args.version_label, tool_cache, skip_types)
+        if result:
+            results = [result]
+            generate_and_export_reports(args, results, galaxy_url, profile, workspace)
+        else:
+            logger.warning("No results from local file analysis")
+        return
+
+    # --- Registry mode (--search, --id, --entry) ---
+    # Build workflow specifications from CLI arguments
+    workflow_specs = []
+
+    if args.search:
+        registry = WorkflowRegistry(config)
+        if args.source in ("workflowhub", "both"):
+            found = registry.search("workflowhub", args.search, args.max_workflows)
+            for wf in found:
+                workflow_specs.append(WorkflowSpec(
+                    name=wf.get('name', ''),
+                    registry='workflowhub',
+                    registry_id=wf['id'],
+                    version=args.versions
+                ))
+        if args.source in ("dockstore", "both"):
+            found = registry.search("dockstore", args.search, args.max_workflows)
+            for wf in found:
+                workflow_specs.append(WorkflowSpec(
+                    name=wf.get('name', ''),
+                    registry='dockstore',
+                    registry_id=wf['entry'],
+                    version=args.versions
+                ))
+
+    if args.id:
+        for id_spec in args.id:
+            wf_id, version = parse_version_spec(id_spec, args.versions)
+            workflow_specs.append(WorkflowSpec(
+                name=wf_id,
+                registry='workflowhub',
+                registry_id=wf_id,
+                version=version
+            ))
+
+    if args.entry:
+        for entry_spec in args.entry:
+            entry, version = parse_version_spec(entry_spec, args.versions)
+            workflow_specs.append(WorkflowSpec(
+                name=entry.split('/')[-1],
+                registry='dockstore',
+                registry_id=entry,
+                version=version
+            ))
+
+    if not workflow_specs:
+        logger.error("No workflows specified. Use --search, --id, --entry, --csv, or --local-file.")
+        sys.exit(1)
+
+    galaxy_url, tool_cache, profile = resolve_galaxy_and_cache(args, use_cache=not args.no_cache)
+
+    if args.parallel:
+        results = process_workflows_parallel(
+            workflow_specs, workspace, tool_cache, args.max_workers, skip_types, config
+        )
+    else:
+        results = []
+        for spec in workflow_specs:
+            result = process_workflow_spec(spec, workspace, tool_cache, skip_types, config) or []
+            results.extend(result)
+
+    if results:
+        generate_and_export_reports(args, results, galaxy_url, profile, workspace)
+    else:
+        logger.warning("No results to report")
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,56 @@
+# config.yaml - Galaxy Workflow Checker Configuration
+
+workflowhub:
+  trs_base: "https://workflowhub.eu/ga4gh/trs/v2"
+  base_url: "https://workflowhub.eu"
+
+dockstore:
+  base_url: "https://dockstore.org"
+  trs_base: "https://dockstore.org/api/ga4gh/trs/v2"
+
+galaxy_instances:
+  # Friendly names for known Galaxy instances
+  friendly_names:
+    "usegalaxy.org.au": "Galaxy Australia"
+    "genome.usegalaxy.org.au": "Galaxy Australia"
+    "usegalaxy.org": "Galaxy Main"
+    "usegalaxy.eu": "Galaxy Europe"
+    "galaxy.au": "Galaxy Australia"
+    "usegalaxy.org": "Galaxy Main"
+
+  # Default Galaxy instances for the lister
+  default_instances:
+    - url: "https://usegalaxy.org.au"
+      name: "Galaxy Australia"
+    - url: "https://usegalaxy.org"
+      name: "Galaxy Main"
+    - url: "https://usegalaxy.eu"
+      name: "Galaxy Europe"
+
+defaults:
+  profile_name: "galaxy_profile"
+  workspace_dir: "./workflow_workspace"
+  output_base: "workflow_check_report"
+  max_workflows: 10
+  version_selection: "latest"
+  max_workers: 5
+
+workflowhub_rest:
+  base_url: "https://workflowhub.eu"
+  token_file: "~/.workflowhub/api_token.txt"
+  projects: ["30", "54"]  # default projects for list-project without ID
+
+# Step types to skip during wiring checks
+skip_step_types:
+  - "data_input"
+  - "data_collection_input"
+  - "parameter_input"
+  - "pause"
+
+# Lister configuration
+lister:
+  default_limit: 100
+  export_formats:
+    - "csv"
+    - "tsv"
+    - "json"

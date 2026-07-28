@@ -1,0 +1,20 @@
+[build-system]
+requires = ["setuptools>=45.0.0", "wheel>=0.36.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "galaxy-workflow-checker"
+version = "2.0.0"
+description = "Check whether Galaxy workflow tools are installed in a Galaxy instance"
+readme = "README.md"
+requires-python = ">=3.7"
+dependencies = [
+    "PyYAML>=6.0",
+    "bioblend>=1.0.0"
+]
+
+[project.scripts]
+gwc = "gwc.main:main"
+
+[tool.setuptools]
+packages = ["gwc"]

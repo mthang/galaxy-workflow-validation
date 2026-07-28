@@ -1,0 +1,211 @@
+"""Command-line argument parser with all options from the combined script."""
+
+import argparse
+from pathlib import Path
+
+
+def add_hub_arguments(subparsers):
+    """Add the 'hub' subcommand for WorkflowHub metadata operations."""
+    hub_parser = subparsers.add_parser(
+        'hub',
+        help='Interact with WorkflowHub REST API (metadata, projects, RO-Crate)'
+    )
+    hub_subparsers = hub_parser.add_subparsers(dest='hub_action', required=True)
+
+    # list-mine
+    mine_parser = hub_subparsers.add_parser('list-mine', help='List workflows you contributed to')
+    mine_parser.add_argument('--token-file', help='Path to token file')
+    mine_parser.add_argument('--format', choices=['table', 'tsv', 'json'], default='table')
+
+    # list-project
+    project_parser = hub_subparsers.add_parser('list-project', help='List workflows in a project')
+    project_parser.add_argument('project_id', nargs='?', help='Project ID (defaults to configured projects)')
+    project_parser.add_argument('--class', dest='workflow_class', help='Filter by workflow class (e.g., galaxy)')
+    project_parser.add_argument('--token-file', help='Path to token file')
+    project_parser.add_argument('--format', choices=['table', 'tsv', 'json'], default='table')
+
+    # get
+    get_parser = hub_subparsers.add_parser('get', help='Get detailed metadata for a workflow')
+    get_parser.add_argument('workflow_id', help='Workflow ID')
+    get_parser.add_argument('--token-file', help='Path to token file')
+    get_parser.add_argument('--format', choices=['table', 'tsv', 'json'], default='table')
+
+    # list-related
+    related_parser = hub_subparsers.add_parser('list-related', help='List related items (data, publications, etc.)')
+    related_parser.add_argument('workflow_id', help='Workflow ID')
+    related_parser.add_argument('--token-file', help='Path to token file')
+    related_parser.add_argument('--format', choices=['table', 'tsv', 'json'], default='table')
+
+    # download-rocrate
+    rocrate_parser = hub_subparsers.add_parser('download-rocrate', help='Download RO-Crate zip')
+    rocrate_parser.add_argument('workflow_id', help='Workflow ID')
+    rocrate_parser.add_argument('--output-dir', help='Output directory (default: current)')
+    rocrate_parser.add_argument('--token-file', help='Path to token file')
+
+
+def add_workflow_listing_arguments(parser):
+    """Add arguments for workflow listing functionality."""
+    listing_group = parser.add_argument_group('Workflow Listing Options')
+    listing_group.add_argument("--list-published", action="store_true",
+                              help="List published workflows from Galaxy instance")
+    listing_group.add_argument("--search-workflows", metavar="TERM",
+                              help="Search published workflows by name")
+    listing_group.add_argument("--filter-tag", metavar="TAG",
+                              help="Filter published workflows by tag")
+    listing_group.add_argument("--workflow-stats", action="store_true",
+                              help="Show statistics for published workflows")
+    listing_group.add_argument("--export-workflows", metavar="FILE.csv",
+                              help="Export workflow list to CSV")
+    listing_group.add_argument("--workflow-limit", type=int, default=50,
+                              help="Maximum number of workflows to list (0 for all)")
+
+
+def parse_args():
+    """Parse command line arguments."""
+    parser = argparse.ArgumentParser(
+        description="Galaxy Workflow Tool Checker with Published Workflow Listing",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+        epilog="""
+Examples:
+  # Check a workflow
+  python -m gwc.main --source workflowhub --id 645
+  
+  # List published workflows
+  python -m gwc.main --list-published --galaxy-url https://usegalaxy.org.au
+  
+  # List with statistics
+  python -m gwc.main --workflow-stats --galaxy-url https://usegalaxy.org.au
+"""
+    )
+
+    # Configuration file
+    parser.add_argument("--config", "-c",
+                       help="YAML configuration file (overrides other options)")
+
+    # Source
+    parser.add_argument("--source", choices=["dockstore", "workflowhub", "both"],
+                       default="both",
+                       help="Workflow registry to query (default: both)")
+
+    # Workflow selection
+    parser.add_argument("--search", "-s",
+                       help="Search workflows by keyword/name")
+    parser.add_argument("--id", nargs="+",
+                       metavar="ID[:VERSION]",
+                       help="One or more WorkflowHub workflow IDs (use with --source workflowhub). "
+                            "Optionally append :version to pin a specific version for that workflow, "
+                            "e.g. --id 403:v2.0.8 875:Version3 876. "
+                            "Workflows without a :version use --versions (default: latest).")
+    parser.add_argument("--entry", "-e", nargs="+",
+                       metavar="ENTRY[:VERSION]",
+                       help="One or more Dockstore workflow entry paths (use with --source dockstore). "
+                            "Optionally append :version to pin a specific version, "
+                            "e.g. --entry github.com/iwc-workflows/VGP3/main:v0.3.5. "
+                            "Entries without a :version use --versions (default: latest).")
+    parser.add_argument("--csv", metavar="FILE.csv",
+                       help="CSV file with columns: name,registry,registry_id,recommended_version")
+    parser.add_argument("--max-workflows", "-mw", type=int, default=10,
+                       help="Max workflows to return from a search (default: 10)")
+
+    # Version selection
+    parser.add_argument("--versions", "-v", default="latest",
+                       help="Which versions to check: latest (default) | all | "
+                            "N (e.g. 3 most recent) | specific e.g. v1.3 | "
+                            "comma-separated e.g. v1.3,v1.4")
+
+    # Galaxy credentials
+    parser.add_argument("--profile", default="galaxy_profile",
+                       help="Planemo profile name to read Galaxy credentials from "
+                            "(default: galaxy_profile)")
+    parser.add_argument("--galaxy-url",
+                       help="Target Galaxy URL for keyless public access, e.g. "
+                            "https://usegalaxy.org.au . Reads the public tool panel "
+                            "directly with NO API key or Planemo profile. Use for "
+                            "public instances; takes precedence over --profile. For "
+                            "private instances, use --profile instead.")
+
+    # Output
+    parser.add_argument("--output", "-o", default="workflow_check_report",
+                       help="Base name for output files, no extension "
+                            "(default: workflow_check_report) "
+                            "produces <name>.txt, <name>.json, <name>.html")
+    parser.add_argument("--format", choices=["txt", "json", "html", "all"], default="all",
+                       help="Output format: txt, json, html, all (default: all)")
+    parser.add_argument("--workspace", "-w", default="./workflow_workspace",
+                       help="Directory for downloaded .ga files (default: ./workflow_workspace)")
+    parser.add_argument("--log-file", help="Path to log file")
+
+    # Performance options
+    parser.add_argument("--parallel", action="store_true",
+                       help="Process workflows in parallel (faster)")
+    parser.add_argument("--max-workers", type=int, default=5,
+                       help="Maximum parallel workers (default: 5)")
+    parser.add_argument("--no-cache", action="store_true",
+                       help="Disable tool cache (forces refresh)")
+    parser.add_argument("--cache-age", type=int, default=24,
+                       help="Maximum cache age in hours (default: 24)")
+
+    # Flags
+    parser.add_argument("--list-only", action="store_true",
+                       help="List matching workflows without checking tools")
+    parser.add_argument("--local-file", metavar="PATH",
+                       help="Check a local .ga file directly instead of fetching from a registry. "
+                            "All static checks and (if credentials are available) tool availability "
+                            "checks are run. Use --version-label to set the version shown in the report.")
+    parser.add_argument("--version-label", default="local",
+                       help="Version label to use in the report when checking a local file "
+                            "(default: local). Only used with --local-file.")
+    parser.add_argument("--static-only", action="store_true",
+                       help="Run only the static checks (structural consistency and wiring gaps). "
+                            "Skip the Galaxy tool availability check. No Galaxy credentials needed. "
+                            "Only used with --local-file.")
+    parser.add_argument("--export-install-script", action="store_true",
+                       help="Generate a shell script to install missing tools")
+    parser.add_argument("--export-tool-issues-csv", action="store_true",
+                       help="Export tool issues to CSV format")
+    parser.add_argument("--compare-workflows", action="store_true",
+                       help="Compare tool requirements across workflows")
+    parser.add_argument("--verbose", "-V", action="store_true",
+                       help="Enable verbose output (DEBUG level logging)")
+
+    # Workflow listing options (integrated)
+    add_workflow_listing_arguments(parser)
+
+    args = parser.parse_args()
+
+    # Validate combinations
+    if args.static_only and not args.local_file:
+        parser.error("--static-only requires --local-file")
+
+    if args.csv:
+        if args.search or args.id or args.entry:
+            parser.error("--csv cannot be used with --search, --id, or --entry")
+        return args
+
+    if args.local_file:
+        if not Path(args.local_file).exists():
+            parser.error(f"--local-file: file not found: {args.local_file}")
+        return args
+
+    if args.source == "workflowhub" and args.entry:
+        parser.error("--entry is for Dockstore workflows; use --id for WorkflowHub")
+    if args.source == "dockstore" and args.id:
+        parser.error("--id is for WorkflowHub workflows; use --entry for Dockstore")
+
+    # If workflow listing options are used, no other selection needed
+    if args.list_published or args.search_workflows or args.filter_tag or args.workflow_stats:
+        return args
+
+    if not any([args.search, args.id, args.entry, args.csv, args.local_file, args.config]):
+        parser.error("Provide at least one of: --search, --id, --entry, --csv, --local-file, --config, "
+                     "or a listing option (--list-published, --search-workflows, --filter-tag, --workflow-stats)")
+
+    return args
+
+
+def parse_version_spec(spec: str, default: str) -> tuple:
+    """Split ID[:VERSION] into (id_or_entry, version_spec)."""
+    if ":" in spec:
+        left, version = spec.split(":", 1)
+        return left.strip(), version.strip()
+    return spec.strip(), default
