@@ -4,3 +4,10 @@ gwc/gwc/main.py_missingVersions
 gwc/gwc/cli/parser.py_
 gwc/gwc/cli/parser.py_latest_working
 gwc/gwc/cli/parser.py_latest_working_v2
+gwc/gwc/__pycache__/
+gwc/gwc/utils/__pycache__/
+gwc/gwc/models/__pycache__/
+gwc/gwc/lister/__pycache__/
+gwc/gwc/core/__pycache__/
+gwc/gwc/services/__pycache__/
+gwc/gwc/cli/__pycache__/
